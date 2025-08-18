@@ -20,6 +20,14 @@ class CodeQuestion(models.Model):
     compiled_spec = models.JSONField(default=dict, blank=True, help_text="Compiled spec used to generate test runners.")
     compiled_at = models.DateTimeField(null=True, blank=True, help_text="When compiled_spec was last refreshed.")
     compiled_version = models.PositiveIntegerField(default=0, help_text="Bumped whenever compiled_spec changes.")
+    compiled_runner_cache = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Cache of rendered test runner code per language. "
+            "Format: {lang: {version, generator_version, content}}"
+        ),
+    )
 
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
