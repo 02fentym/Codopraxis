@@ -38,7 +38,7 @@
         <li class="menu-title mt-2">Account</li>
         <li class="mt-auto pt-2 border-t border-base-300">
             {% if user.is_authenticated %}
-            <div class="px-2 py-1 text-sm opacity-70">Hello, {{ user.email }}</div>
+            <div class="px-2 py-1 text-sm text-neutral-content">Hello, {{ user.email }}</div>
             <form method="post" action="{% url 'logout' %}">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-ghost justify-start">Logout</button>
