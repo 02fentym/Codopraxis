@@ -79,6 +79,10 @@ def compile_question(question) -> CompileResult:
         spec = {"test_style": "oop", "test_cases": normalized_cases}
     else:
         raise ValueError(f"Unknown test_style: {style}")
+    
+    spec["timeout_seconds"] = question.timeout_seconds
+    #if style == "function":
+    #    spec["function"] = (question.function_name or "").strip()
 
     # Persist snapshot on the question
     question.compiled_spec = spec

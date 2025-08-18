@@ -29,6 +29,13 @@ class CodeQuestion(models.Model):
         ),
     )
 
+    # only used when test_style == "function"
+    function_name = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Name of the function to call for function-style questions (e.g., 'add')",
+    )
+
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
