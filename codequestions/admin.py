@@ -47,36 +47,9 @@ class CodeQuestionAdmin(admin.ModelAdmin):
     list_display = ("id", "test_style", "language", "topic", "compiled_version", "created", "updated")
     list_filter = ("test_style", "language", "topic")
     search_fields = ("prompt",)
-    readonly_fields = ("created", "updated", "compiled_at", "compiled_version", "compile_actions")
-    actions = [compile_selected]
+    readonly_fields = ("created", "updated", "compiled_at", "compiled_version")
     inlines = [CodeTestCaseInline]
 
-    # --- Add a custom URL for the button ---
-    def get_urls(self):
-        urls = super().get_urls()
-        custom = [
-            path(
-                "<int:object_id>/compile/",
-                self.admin_site.admin_view(self.compile_single),
-                name="codequestions_codequestion_compile",
-            ),
-        ]
-        return custom + urls
-
-    # --- The view that compiles a single question ---
-    def compile_single(self, request, object_id: int):
-        q = self.get_object(request, object_id)
-        res = compile_question(q)
-        messages.success(request, f"Compiled {res.count} case(s) for question #{q.pk}.")
-        return redirect(reverse("admin:codequestions_codequestion_change", args=[object_id]))
-
-    # --- A read-only field that renders the button on the change form ---
-    def compile_actions(self, obj):
-        if not obj or not obj.pk:
-            return "-"
-        url = reverse("admin:codequestions_codequestion_compile", args=[obj.pk])
-        return format_html('<a class="button" href="{}">Compile now</a>', url)
-    compile_actions.short_description = "Actions"
 
 
 @admin.register(CodeTestCase)
