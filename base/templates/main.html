@@ -9,8 +9,17 @@
     <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
 </head>
 
-<body class="bg-base-100 text-base-content">
-    {% block content %}{% endblock %}
+<body class="min-h-screen flex">
+
+    {% if user.is_authenticated %}
+    {% include "base/sidebar.html" %}
+    {% endif %}
+
+    <!-- Only one block here -->
+    <main class="flex-1 p-6">
+        {% block content %}{% endblock %}
+    </main>
+
 </body>
 
 </html>

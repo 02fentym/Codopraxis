@@ -3,10 +3,13 @@ from . import views
 from django.contrib.auth import views as auth_views
 from .forms import StyledPasswordResetForm, StyledSetPasswordForm
 from django.views.generic import TemplateView
+from django.contrib.auth.views import LogoutView
+
 
 
 urlpatterns = [
     path("login/",  views.email_login, name="login"),
+    path("logout/", LogoutView.as_view(), name="logout"),
     path("signup/", views.signup, name="signup"), 
     path("activate/sent/", TemplateView.as_view(template_name="auth/activation_sent.html"), name="activation-sent"),
     path("activate/<uidb64>/<token>/", views.activate, name="activate"),
