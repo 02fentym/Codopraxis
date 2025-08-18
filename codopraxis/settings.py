@@ -29,6 +29,7 @@ INSTALLED_APPS = [
 
     'accounts', # for handling login or registration
     'base',
+    'codequestions',
 ]
 
 # User authentication
