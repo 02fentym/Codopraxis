@@ -9,14 +9,32 @@ from django.contrib.auth.tokens import default_token_generator
 from django.template.loader import render_to_string
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model, login
-from .forms import ResendActivationForm, SignUpForm
+from .forms import ResendActivationForm, SignUpForm, EmailAuthenticationForm
+from django.utils.safestring import mark_safe
 
 
 User = get_user_model()
 
-def email_login_view(request):
+def email_login(request):
     if request.method == "POST":
         form = EmailAuthenticationForm(request, data=request.POST)
+
+        # Friendly inactive-account handling before form.is_valid()
+        email = (request.POST.get("username") or "").strip()
+        password = request.POST.get("password") or ""
+        if email and password:
+            user = User.objects.filter(email__iexact=email).first()
+            if user and user.check_password(password) and not user.is_active:
+                resend_url = reverse("resend-activation")
+                form.add_error(
+                    None,
+                    mark_safe(
+                        f"Your account isn’t activated yet. "
+                        f'<a class="link" href="{resend_url}">Resend activation email</a>.'
+                    ),
+                )
+                return render(request, "registration/login.html", {"form": form})
+
         if form.is_valid():
             user = form.get_user()
             login(request, user)
@@ -35,6 +53,10 @@ def email_login_view(request):
         form = EmailAuthenticationForm(request)
 
     return render(request, "registration/login.html", {"form": form})
+
+# Back-compat alias (optional): keep old import working
+email_login_view = email_login
+
 
 
 def signup(request):

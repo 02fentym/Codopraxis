@@ -6,7 +6,7 @@ from django.views.generic import TemplateView
 
 
 urlpatterns = [
-    path("login/",  views.email_login_view, name="login"),
+    path("login/",  views.email_login, name="login"),
     path("signup/", views.signup, name="signup"), 
     path("activate/sent/", TemplateView.as_view(template_name="auth/activation_sent.html"), name="activation-sent"),
     path("activate/<uidb64>/<token>/", views.activate, name="activate"),
