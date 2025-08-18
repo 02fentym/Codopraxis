@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+*.pyo
+*.pyd
+
+# Virtualenv
+venv/
+.env
+
+# Django
+db.sqlite3
+/static/
+/media/
+
+# IDE
+.vscode/
+.idea/
+
+# Node
+node_modules/
+
+# npm cache/logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Tailwind build artifacts
+/static/css/output.css
+
+# MacOS
+.DS_Store

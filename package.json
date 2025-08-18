@@ -1,0 +1,26 @@
+{
+    "name": "codopraxis",
+    "version": "1.0.0",
+    "main": "index.js",
+    "scripts": {
+        "dev:css": "tailwindcss -i ./static/src/input.css -o ./static/css/tailwind.css -w",
+        "build:css": "tailwindcss -i ./static/src/input.css -o ./static/css/tailwind.css --minify",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/02fentym/Codopraxis.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/02fentym/Codopraxis/issues"
+    },
+    "homepage": "https://github.com/02fentym/Codopraxis#readme",
+    "description": "",
+    "devDependencies": {
+        "daisyui": "^5.0.50",
+        "tailwindcss": "^4.1.12"
+    }
+}

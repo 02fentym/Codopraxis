@@ -1,0 +1,133 @@
+{% extends "main.html" %}
+{% block content %}
+
+<!-- Theme Toggle -->
+<div class="flex justify-end mb-8">
+  <label class="swap swap-rotate text-3xl">
+    <input type="checkbox" onclick="toggleTheme()" />
+    <!-- sun icon -->
+    <svg class="swap-on fill-current w-10 h-10" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <path d="M5.64,17l-.71.71a1,1,0,0,0,0,1.41,1,1,0,0,0,1.41,0l.71-.71A1,1,0,0,0,5.64,17ZM5,12a1,1,0,0,0-1-1H3a1,1,0,0,0,0,2H4A1,1,0,0,0,5,12Zm7-7a1,1,0,0,0,1-1V3a1,1,0,0,0-2,0V4A1,1,0,0,0,12,5ZM18.36,6.36a1,1,0,0,0,.71-.29,1,1,0,0,0,0-1.41l-.71-.71A1,1,0,0,0,17,5.64l.71.71A1,1,0,0,0,18.36,6.36ZM22,12a1,1,0,0,0-1-1H20a1,1,0,0,0,0,2h1A1,1,0,0,0,22,12ZM12,17a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V18A1,1,0,0,0,12,17ZM4.22,18.36a1,1,0,0,0,.71.29,1,1,0,0,0,.71-.29l.71-.71A1,1,0,0,0,6,16.93Zm12,1.55a1,1,0,0,0-.71.29l-.71.71a1,1,0,1,0,1.41,1.41l.71-.71A1,1,0,0,0,16.22,19.91ZM12,6a6,6,0,1,0,6,6A6,6,0,0,0,12,6Zm0,10a4,4,0,1,1,4-4A4,4,0,0,1,12,16Z"/>
+    </svg>
+    <!-- moon icon -->
+    <svg class="swap-off fill-current w-10 h-10" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <path d="M21.64,13a1,1,0,0,0-1.05-.14,8.05,8.05,0,0,1-11.4,9.05,1.06,1.06,0,0,0-.73-.41A1.06,1.06,0,0,0,8.1,21.84,9.91,9.91,0,0,0,17.41,18.91,1.06,1.06,0,0,0,18.88,20.08,1,1,0,0,0,19.33,21.05a1.06,1.06,0,0,0,.58,0,1,1,0,0,0,.43-.53A1,1,0,0,0,21.64,13Z"/>
+    </svg>
+  </label>
+</div>
+
+<!-- Typography -->
+<div class="space-y-4">
+  <h1 class="text-4xl font-bold text-primary">Heading 1 - Primary Color</h1>
+  <h2 class="text-3xl font-semibold text-secondary">Heading 2 - Secondary Color</h2>
+  <h3 class="text-2xl font-medium text-accent">Heading 3 - Accent Color</h3>
+  <p class="text-lg text-neutral-content">This is a paragraph with a neutral content color.</p>
+  <p class="text-base text-base-content">This is another paragraph with a base content color.</p>
+</div>
+
+<!-- Buttons -->
+<div class="space-y-4 mt-8">
+  <h2 class="text-2xl font-bold text-base-content">Buttons</h2>
+  <div class="flex flex-wrap items-center gap-4">
+    <button class="btn btn-primary">Primary</button>
+    <button class="btn btn-secondary">Secondary</button>
+    <button class="btn btn-accent">Accent</button>
+    <button class="btn btn-neutral">Neutral</button>
+    <button class="btn btn-info">Info</button>
+    <button class="btn btn-success">Success</button>
+    <button class="btn btn-warning">Warning</button>
+    <button class="btn btn-error">Error</button>
+    <button class="btn btn-ghost">Ghost</button>
+    <button class="btn btn-link">Link</button>
+    <button class="btn btn-outline btn-primary">Outline Primary</button>
+    <button class="btn btn-disabled">Disabled</button>
+  </div>
+</div>
+
+<!-- Cards -->
+<div class="space-y-4 mt-8">
+  <h2 class="text-2xl font-bold text-base-content">Cards</h2>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="card bg-base-200 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title text-base-content">Base 200 Card</h2>
+        <p class="text-base-content">A standard card to showcase the base-200 background color.</p>
+        <div class="card-actions justify-end">
+          <button class="btn btn-primary">Action</button>
+        </div>
+      </div>
+    </div>
+    <div class="card bg-base-300 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title text-base-content">Base 300 Card</h2>
+        <p class="text-base-content">Slightly darker surface for separation.</p>
+        <div class="card-actions justify-end">
+          <button class="btn btn-accent">Action</button>
+        </div>
+      </div>
+    </div>
+    <div class="card bg-neutral shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title text-neutral-content">Neutral Card</h2>
+        <p class="text-neutral-content">Great for non-promotional sections.</p>
+        <div class="card-actions justify-end">
+          <button class="btn btn-secondary">Action</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Alerts -->
+<div class="space-y-4 mt-8">
+  <h2 class="text-2xl font-bold text-base-content">Alerts</h2>
+  <div class="space-y-4">
+    <div role="alert" class="alert alert-info"><span>Info: This is an informational alert.</span></div>
+    <div role="alert" class="alert alert-success"><span>Success: The operation was successful.</span></div>
+    <div role="alert" class="alert alert-warning"><span>Warning: Proceed with caution.</span></div>
+    <div role="alert" class="alert alert-error"><span>Error: Something went wrong.</span></div>
+  </div>
+</div>
+
+<!-- Input and Form Elements -->
+<div class="space-y-4 mt-8">
+  <h2 class="text-2xl font-bold text-base-content">Form Elements</h2>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <label class="form-control w-full">
+      <div class="label"><span class="label-text">Your Name</span></div>
+      <input type="text" placeholder="Type here" class="input input-bordered w-full" />
+    </label>
+    <label class="form-control w-full">
+      <div class="label"><span class="label-text">Checkbox</span></div>
+      <input type="checkbox" class="checkbox" />
+    </label>
+    <label class="form-control w-full md:col-span-2">
+      <div class="label"><span class="label-text">Select Box</span></div>
+      <select class="select select-bordered w-full">
+        <option disabled selected>Pick one</option>
+        <option>Option 1</option>
+        <option>Option 2</option>
+      </select>
+    </label>
+  </div>
+</div>
+
+<script>
+  function toggleTheme() {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme') || 'light';
+    const next = current === 'codo_dark' ? 'light' : 'codo_dark';
+    html.setAttribute('data-theme', next);
+    // optional: persist choice
+    try { localStorage.setItem('theme', next); } catch (_) {}
+  }
+  // restore persisted theme
+  (function () {
+    try {
+      const saved = localStorage.getItem('theme');
+      if (saved) document.documentElement.setAttribute('data-theme', saved);
+    } catch (_) {}
+  })();
+</script>
+
+{% endblock %}
