@@ -10,6 +10,7 @@ urlpatterns = [
     path("signup/", views.signup, name="signup"), 
     path("activate/sent/", TemplateView.as_view(template_name="auth/activation_sent.html"), name="activation-sent"),
     path("activate/<uidb64>/<token>/", views.activate, name="activate"),
+    path("activate/resend/", views.resend_activation, name="resend-activation"),
 
     # password reset (all hyphenated)
     path(

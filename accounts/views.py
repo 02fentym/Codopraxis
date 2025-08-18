@@ -9,6 +9,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.template.loader import render_to_string
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model, login
+from .forms import ResendActivationForm, SignUpForm
 
 
 User = get_user_model()
@@ -37,13 +38,11 @@ def email_login_view(request):
 
 
 def signup(request):
-    from .forms import SignUpForm  # adjust if your form is elsewhere
-
     if request.method == "POST":
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
-            user.is_active = False  # ⬅️ critical: require email verify
+            user.is_active = False  # require email verification
             user.save()
 
             # Build activation link parts
@@ -52,14 +51,20 @@ def signup(request):
             domain = request.get_host()
             protocol = "https" if request.is_secure() else "http"
 
-            # Subject & body from templates
+            # Subject & body from your new templates
             subject = render_to_string(
-                "auth/email_activation_subject.txt",
-                {"user": user}
+                "auth/account_activation_subject.txt",
+                {"user": user},
             ).strip()
             message = render_to_string(
-                "auth/email_activation_email.txt",
-                {"user": user, "domain": domain, "protocol": protocol, "uid": uid, "token": token}
+                "auth/account_activation_email.txt",
+                {
+                    "user": user,
+                    "domain": domain,
+                    "protocol": protocol,
+                    "uid": uid,
+                    "token": token,
+                },
             )
 
             # Send email
@@ -75,7 +80,9 @@ def signup(request):
     else:
         form = SignUpForm()
 
+    # use your existing signup template
     return render(request, "registration/signup.html", {"form": form})
+
 
 
 def activate(request, uidb64, token):
@@ -95,3 +102,47 @@ def activate(request, uidb64, token):
     else:
         # invalid or expired token
         return render(request, "auth/activation_invalid.html")
+    
+
+def resend_activation(request):
+    if request.method == "POST":
+        form = ResendActivationForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data["email"].lower()
+
+            # Find user silently
+            try:
+                user = User.objects.get(email__iexact=email)
+            except User.DoesNotExist:
+                user = None
+
+            # Only send if user exists and is inactive
+            if user and not user.is_active:
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                token = default_token_generator.make_token(user)
+                domain = request.get_host()
+                protocol = "https" if request.is_secure() else "http"
+
+                subject = render_to_string(
+                    "auth/email_activation_subject.txt",
+                    {"user": user}
+                ).strip()
+                message = render_to_string(
+                    "auth/email_activation_email.txt",
+                    {"user": user, "domain": domain, "protocol": protocol, "uid": uid, "token": token}
+                )
+
+                send_mail(
+                    subject,
+                    message,
+                    getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                    [user.email],
+                    fail_silently=False,
+                )
+
+            # Always redirect to the generic “check your email” page
+            return redirect("activation-sent")
+    else:
+        form = ResendActivationForm()
+
+    return render(request, "auth/resend_activation.html", {"form": form})

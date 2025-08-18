@@ -1,0 +1,7 @@
+Hi {{ user.email }},
+
+Please click the link below to verify your account:
+
+http://{{ domain }}{% url 'activate' uidb64=uid token=token %}
+
+If you didn’t create this account, you can ignore this email.

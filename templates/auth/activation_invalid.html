@@ -9,7 +9,8 @@
                 You can request a new activation email from the signup page.
             </p>
             <div class="space-y-2">
-                <a class="btn btn-primary w-full" href="{% url 'signup' %}">Create account</a>
+                <a class="btn btn-primary w-full" href="{% url 'resend-activation' %}">Resend activation email</a>
+                <a class="btn btn-ghost w-full" href="{% url 'signup' %}">Create account</a>
                 <a class="btn btn-ghost w-full" href="{% url 'login' %}">Back to login</a>
             </div>
         </div>

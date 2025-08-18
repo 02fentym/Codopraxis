@@ -133,3 +133,10 @@ class SignUpForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
+
+class ResendActivationForm(forms.Form):
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={"autocomplete": "email", "class": "input input-bordered w-full"})
+    )
