@@ -1,0 +1,15 @@
+{% extends "main.html" %}
+{% block title %}Email verified{% endblock %}
+{% block content %}
+<div class="min-h-[60vh] flex items-center justify-center p-6">
+    <div class="card w-full max-w-md bg-base-100 shadow-xl">
+        <div class="card-body space-y-4">
+            <h1 class="card-title justify-center">Your email is verified 🎉</h1>
+            <p class="text-sm text-base-content/70 text-center">
+                Your account is now active{% if user %}, {{ user.email }}{% endif %}. You’re logged in.
+            </p>
+            <a class="btn btn-primary w-full" href="/">Go to dashboard</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

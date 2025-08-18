@@ -1,11 +1,15 @@
 from django.urls import path, include, reverse_lazy
-from .views import email_login_view, signup_view
+from . import views
 from django.contrib.auth import views as auth_views
 from .forms import StyledPasswordResetForm, StyledSetPasswordForm
+from django.views.generic import TemplateView
+
 
 urlpatterns = [
-    path("login/",  email_login_view, name="login"),
-    path("signup/", signup_view,      name="signup"), 
+    path("login/",  views.email_login_view, name="login"),
+    path("signup/", views.signup, name="signup"), 
+    path("activate/sent/", TemplateView.as_view(template_name="auth/activation_sent.html"), name="activation-sent"),
+    path("activate/<uidb64>/<token>/", views.activate, name="activate"),
 
     # password reset (all hyphenated)
     path(

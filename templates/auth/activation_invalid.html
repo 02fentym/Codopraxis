@@ -1,0 +1,18 @@
+{% extends "main.html" %}
+{% block title %}Activation link invalid{% endblock %}
+{% block content %}
+<div class="min-h-[60vh] flex items-center justify-center p-6">
+    <div class="card w-full max-w-md bg-base-100 shadow-xl">
+        <div class="card-body space-y-4">
+            <h1 class="card-title justify-center">This link is invalid or expired</h1>
+            <p class="text-sm text-base-content/70 text-center">
+                You can request a new activation email from the signup page.
+            </p>
+            <div class="space-y-2">
+                <a class="btn btn-primary w-full" href="{% url 'signup' %}">Create account</a>
+                <a class="btn btn-ghost w-full" href="{% url 'login' %}">Back to login</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
