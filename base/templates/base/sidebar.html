@@ -1,26 +1,52 @@
 <!-- base/sidebar.html -->
-<aside class="w-64 min-h-screen bg-base-200 p-4 flex flex-col justify-between">
-    <div>
-        <h2 class="text-xl font-bold mb-6">Codopraxis</h2>
-
-        <nav class="space-y-2">
-            <a href="{% url 'home' %}" class="btn btn-ghost w-full justify-start">🏠 Home</a>
-            <a href="#" class="btn btn-ghost w-full justify-start">📘 Courses</a>
-            <a href="#" class="btn btn-ghost w-full justify-start">📝 Quizzes</a>
-            <a href="#" class="btn btn-ghost w-full justify-start">⚙️ Settings</a>
-        </nav>
+<aside class="w-80 min-h-full bg-base-200">
+    <!-- Mobile header inside the drawer -->
+    <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-base-200 lg:hidden">
+        <span class="text-lg font-bold">Codopraxis</span>
+        <label for="app-drawer" class="btn btn-ghost btn-sm" aria-label="Close sidebar">✕</label>
     </div>
 
-    <div class="border-t border-base-300 pt-4">
-        {% if user.is_authenticated %}
-            <p class="text-sm mb-2">Hello, {{ user.email }}</p>
+    <ul class="menu px-4 pb-4 gap-1">
+        <li class="menu-title">Navigation</li>
+
+        <li>
+            <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                <span>🏠</span><span>Home</span>
+            </a>
+        </li>
+
+        <!-- Update these URLs/names when your routes exist -->
+        <li>
+            <a href="#"
+                class="{% if request.resolver_match.url_name == 'courses' %}active{% endif %}">
+                <span>📘</span><span>Courses</span>
+            </a>
+        </li>
+        <li>
+            <a href="#"
+                class="{% if request.resolver_match.url_name == 'quizzes' %}active{% endif %}">
+                <span>📝</span><span>Quizzes</span>
+            </a>
+        </li>
+        <li>
+            <a href="#"
+                class="{% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
+                <span>⚙️</span><span>Settings</span>
+            </a>
+        </li>
+
+        <li class="menu-title mt-2">Account</li>
+        <li class="mt-auto pt-2 border-t border-base-300">
+            {% if user.is_authenticated %}
+            <div class="px-2 py-1 text-sm opacity-70">Hello, {{ user.email }}</div>
             <form method="post" action="{% url 'logout' %}">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-ghost w-full text-left">Logout</button>
+                <button type="submit" class="btn btn-ghost justify-start">Logout</button>
             </form>
-        {% else %}
-            <a href="{% url 'login' %}" class="btn btn-sm btn-primary w-full">Login</a>
-            <a href="{% url 'signup' %}" class="btn btn-sm btn-secondary w-full mt-2">Sign up</a>
-        {% endif %}
-    </div>
+            {% else %}
+            <a class="btn btn-primary btn-sm mt-2" href="{% url 'login' %}">Login</a>
+            <a class="btn btn-secondary btn-sm mt-2" href="{% url 'signup' %}">Sign up</a>
+            {% endif %}
+        </li>
+    </ul>
 </aside>

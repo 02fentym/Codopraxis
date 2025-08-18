@@ -9,17 +9,31 @@
     <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
 </head>
 
-<body class="min-h-screen flex">
+<body class="min-h-screen">
+    <div class="drawer lg:drawer-open">
+        <input id="app-drawer" type="checkbox" class="drawer-toggle" />
 
-    {% if user.is_authenticated %}
-    {% include "base/sidebar.html" %}
-    {% endif %}
+        <!-- Page content -->
+        <div class="drawer-content">
+            <!-- Mobile top bar with hamburger -->
+            <div class="p-4 lg:hidden">
+                <label for="app-drawer" class="btn btn-ghost drawer-button">☰</label>
+            </div>
 
-    <!-- Only one block here -->
-    <main class="flex-1 p-6">
-        {% block content %}{% endblock %}
-    </main>
+            <!-- Main content block -->
+            <main class="p-6">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
 
+        <!-- Sidebar -->
+        <div class="drawer-side">
+            <label for="app-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+            {% if user.is_authenticated %}
+            {% include "base/sidebar.html" %}
+            {% endif %}
+        </div>
+    </div>
 </body>
 
 </html>
