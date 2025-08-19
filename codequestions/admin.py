@@ -1,14 +1,11 @@
 from django.contrib import admin, messages
 from django.db import models
 from django import forms
-from django.urls import path, reverse
-from django.shortcuts import redirect
 from django.utils.html import format_html
-
 from .models import CodeQuestion, CodeTestCase
 from .compiler import compile_question
 from .forms import CodeQuestionForm
-
+import json
 
 # codequestions/admin.py
 
@@ -49,8 +46,34 @@ class CodeQuestionAdmin(admin.ModelAdmin):
     list_display = ("id", "test_style", "topic", "compiled_version", "created", "updated")
     list_filter = ("test_style", "topic")
     search_fields = ("prompt",)
-    readonly_fields = ("created", "updated", "compiled_at", "compiled_version")
+    readonly_fields = (
+        "created", "updated", "compiled_at", "compiled_version",
+        "pretty_compiled_spec",
+    )
     inlines = [CodeTestCaseInline]
+
+    fieldsets = (
+        (None, {
+            "fields": ("prompt", "test_style", "topic"),
+        }),
+        ("Compilation", {
+            "fields": ("compiled_version", "compiled_at", "pretty_compiled_spec", "compiled_runner_cache"),
+        }),
+        ("Timestamps", {
+            "fields": ("created", "updated"),
+        }),
+    )
+
+    @admin.display(description="Compiled Spec (pretty)")
+    def pretty_compiled_spec(self, obj):
+        raw = getattr(obj, "compiled_spec", None)
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+            pretty = json.dumps(data, indent=4, ensure_ascii=False)
+        except Exception:
+            pretty = raw if isinstance(raw, str) else str(raw)
+        return format_html("<pre style='white-space:pre-wrap;margin:0'>{}</pre>", pretty)
+
 
 
 
