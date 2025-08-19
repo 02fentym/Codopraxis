@@ -9,7 +9,6 @@ class CodeQuestion(models.Model):
     ]
 
     prompt = models.TextField()
-    language = models.ForeignKey("base.Language", on_delete=models.CASCADE)
     test_style = models.CharField(max_length=20, choices=TEST_STYLE_CHOICES)
     starter_code = models.TextField(blank=True, default="")
 

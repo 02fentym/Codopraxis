@@ -46,8 +46,8 @@ def compile_selected(modeladmin, request, queryset):
 @admin.register(CodeQuestion)
 class CodeQuestionAdmin(admin.ModelAdmin):
     form = CodeQuestionForm
-    list_display = ("id", "test_style", "language", "topic", "compiled_version", "created", "updated")
-    list_filter = ("test_style", "language", "topic")
+    list_display = ("id", "test_style", "topic", "compiled_version", "created", "updated")
+    list_filter = ("test_style", "topic")
     search_fields = ("prompt",)
     readonly_fields = ("created", "updated", "compiled_at", "compiled_version")
     inlines = [CodeTestCaseInline]
@@ -57,7 +57,7 @@ class CodeQuestionAdmin(admin.ModelAdmin):
 @admin.register(CodeTestCase)
 class CodeTestCaseAdmin(admin.ModelAdmin):
     list_display = ("id", "code_question", "name", "order", "is_active", "created_at", "updated_at")
-    list_filter = ("is_active", "code_question__test_style", "code_question__language")
+    list_filter = ("is_active", "code_question__test_style")
     search_fields = ("name", "code_question__prompt")
     ordering = ("code_question", "order", "id")
     readonly_fields = ("created_at", "updated_at")
