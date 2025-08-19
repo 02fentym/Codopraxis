@@ -7,6 +7,7 @@ from django.utils.html import format_html
 
 from .models import CodeQuestion, CodeTestCase
 from .compiler import compile_question
+from .forms import CodeQuestionForm
 
 
 # codequestions/admin.py
@@ -44,6 +45,7 @@ def compile_selected(modeladmin, request, queryset):
 
 @admin.register(CodeQuestion)
 class CodeQuestionAdmin(admin.ModelAdmin):
+    form = CodeQuestionForm
     list_display = ("id", "test_style", "language", "topic", "compiled_version", "created", "updated")
     list_filter = ("test_style", "language", "topic")
     search_fields = ("prompt",)

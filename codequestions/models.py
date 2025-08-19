@@ -11,6 +11,7 @@ class CodeQuestion(models.Model):
     prompt = models.TextField()
     language = models.ForeignKey("base.Language", on_delete=models.CASCADE)
     test_style = models.CharField(max_length=20, choices=TEST_STYLE_CHOICES)
+    starter_code = models.TextField(blank=True, default="")
 
     timeout_seconds = models.PositiveIntegerField(default=5, help_text="Max seconds a student submission may run in Docker.")
     memory_limit_mb = models.PositiveIntegerField(default=128, help_text="Max RAM (in MB) Docker container may use.")
