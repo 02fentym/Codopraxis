@@ -1,10 +1,7 @@
 {% extends "main.html" %}
+{% load static %}
 {% block title %}Run Script Question{% endblock %}
 {% block content %}
-
-<!-- Speed: preconnect to CDN -->
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="dns-prefetch" href="//cdn.jsdelivr.net">
 
 <div class="max-w-5xl mx-auto space-y-6">
 
@@ -34,7 +31,7 @@
         </label>
 
         <div class="card-actions justify-end">
-          <button class="btn btn-primary">Run Tests</button>
+          <button type="submit" class="btn btn-primary">Run Tests</button>
         </div>
       </form>
     </div>
@@ -71,10 +68,10 @@
                 {% for r in results.results %}
                 <tr>
                   <td class="align-top">{{ r.case }}</td>
-                  <td class="align-top"><pre class="text-xs">{{ r.input }}</pre></td>
-                  <td class="align-top"><pre class="text-xs">{{ r.expected }}</pre></td>
-                  <td class="align-top"><pre class="text-xs">{{ r.stdout }}</pre></td>
-                  <td class="align-top"><pre class="text-xs">{{ r.stderr }}</pre></td>
+                  <td class="align-top"><pre class="text-xs whitespace-pre-wrap">{{ r.input }}</pre></td>
+                  <td class="align-top"><pre class="text-xs whitespace-pre-wrap">{{ r.expected }}</pre></td>
+                  <td class="align-top"><pre class="text-xs whitespace-pre-wrap">{{ r.stdout }}</pre></td>
+                  <td class="align-top"><pre class="text-xs whitespace-pre-wrap">{{ r.stderr }}</pre></td>
                   <td class="align-top">
                     {% if r.passed %}
                       <span class="badge badge-success">Passed</span>
@@ -97,11 +94,12 @@
 
 </div>
 
-<!-- Ace (lightweight) -->
-<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/ace.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/mode-python.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/theme-github.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/theme-monokai.js"></script>
+<!-- Ace (local, vendored) -->
+<script src="{% static 'vendor/ace-1.36.2/ace.js' %}"></script>
+<script src="{% static 'vendor/ace-1.36.2/mode-python.js' %}"></script>
+<script src="{% static 'vendor/ace-1.36.2/theme-github.js' %}"></script>
+<script src="{% static 'vendor/ace-1.36.2/theme-monokai.js' %}"></script>
+
 
 <script>
   (function () {

@@ -22,5 +22,8 @@
     "devDependencies": {
         "daisyui": "^5.0.50",
         "tailwindcss": "^4.1.12"
+    },
+    "dependencies": {
+        "ace-builds": "^1.36.2"
     }
 }
