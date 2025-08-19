@@ -2,6 +2,10 @@
 {% block title %}Run Script Question{% endblock %}
 {% block content %}
 
+<!-- Speed: preconnect to CDN -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="dns-prefetch" href="//cdn.jsdelivr.net">
+
 <div class="max-w-5xl mx-auto space-y-6">
 
   <h1 class="text-2xl font-bold">Run Script Question</h1>
@@ -9,17 +13,21 @@
   <!-- Submission Form -->
   <div class="card bg-base-200">
     <div class="card-body">
+      <!-- novalidate: avoid hidden required field issue -->
       <form method="post" class="space-y-4" id="submission-form" novalidate>
         {% csrf_token %}
+
+        <!-- Keep Django textarea for POST; hide it (Ace syncs its value) -->
         <div class="hidden">
           {{ form.code }}
         </div>
 
+        <!-- Ace editor container -->
         <label class="form-control">
           <div class="label">
             <span class="label-text">Your solution (Python)</span>
           </div>
-          <div id="monaco-editor"
+          <div id="ace-editor"
                class="w-full rounded-box ring-1 ring-base-300 bg-base-100"
                style="height: 28rem;">
           </div>
@@ -49,7 +57,14 @@
             <table class="table table-zebra">
               <thead>
                 <tr>
-                  <th>#</th><th>Input</th><th>Expected</th><th>Stdout</th><th>Stderr</th><th>Status</th><th>Timeout</th><th>RC</th>
+                  <th>#</th>
+                  <th>Input</th>
+                  <th>Expected</th>
+                  <th>Stdout</th>
+                  <th>Stderr</th>
+                  <th>Status</th>
+                  <th>Timeout</th>
+                  <th>RC</th>
                 </tr>
               </thead>
               <tbody>
@@ -82,46 +97,58 @@
 
 </div>
 
-<!-- Monaco (for editing) -->
-<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+<!-- Ace (lightweight) -->
+<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/ace.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/mode-python.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/theme-github.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/theme-monokai.js"></script>
+
 <script>
   (function () {
     const hiddenTextarea = document.getElementById("id_code");
-    const container = document.getElementById("monaco-editor");
-    if (hiddenTextarea) hiddenTextarea.removeAttribute('required');
+    if (hiddenTextarea) hiddenTextarea.removeAttribute('required'); // avoid hidden required field HTML5 error
 
-    function currentMonacoTheme() {
+    const container = document.getElementById("ace-editor");
+
+    function currentAceTheme() {
       const theme = document.documentElement.getAttribute("data-theme") || "";
-      return /dark/i.test(theme) ? "vs-dark" : "vs";
+      return /dark/i.test(theme) ? "ace/theme/monokai" : "ace/theme/github";
     }
 
-    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
-    require(['vs/editor/editor.main'], function () {
-      const editor = monaco.editor.create(container, {
-        value: hiddenTextarea ? hiddenTextarea.value : "",
-        language: 'python',
-        theme: currentMonacoTheme(),
-        automaticLayout: true,
-        minimap: { enabled: false },
-        fontSize: 14,
-        wordWrap: 'on',
-      });
+    // Initialize Ace
+    const editor = ace.edit(container);
+    editor.setOptions({
+      mode: "ace/mode/python",
+      theme: currentAceTheme(),
+      value: hiddenTextarea ? hiddenTextarea.value : "",
+      fontSize: "14px",
+      wrap: true,
+      showPrintMargin: false,
+      tabSize: 4,
+      useSoftTabs: true,
+      useWorker: false, // lighter (no JS worker)
+    });
 
-      const ro = new ResizeObserver(() => editor.layout());
-      ro.observe(container);
+    // Keep editor sized if container changes
+    const ro = new ResizeObserver(() => editor.resize());
+    ro.observe(container);
 
-      const mo = new MutationObserver(() => {
-        monaco.editor.setTheme(currentMonacoTheme());
-        editor.layout();
-      });
-      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    // Sync theme if DaisyUI theme toggles
+    const mo = new MutationObserver(() => {
+      editor.setTheme(currentAceTheme());
+      editor.resize();
+    });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-      editor.onDidChangeModelContent(() => {
-        if (hiddenTextarea) hiddenTextarea.value = editor.getValue();
-      });
-      document.getElementById("submission-form").addEventListener("submit", function () {
-        if (hiddenTextarea) hiddenTextarea.value = editor.getValue();
-      });
+    // Live-sync editor → hidden textarea
+    editor.session.on('change', () => {
+      if (hiddenTextarea) hiddenTextarea.value = editor.getValue();
+    });
+
+    // Also sync on submit
+    const form = document.getElementById("submission-form");
+    form.addEventListener("submit", () => {
+      if (hiddenTextarea) hiddenTextarea.value = editor.getValue();
     });
   })();
 </script>
