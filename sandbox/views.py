@@ -30,7 +30,7 @@ def run_script_question(request, pk: int):
         # ⬇️ your two lines, now in context
         results = run_submission(specs, code, language="python")
 
-    return render(request, "codequestions/run_script.html", {
+    return render(request, "sandbox/run_script.html", {
         "question": question,
         "form": form,
         "results": results,

@@ -1,0 +1,129 @@
+{% extends "main.html" %}
+{% block title %}Run Script Question{% endblock %}
+{% block content %}
+
+<div class="max-w-5xl mx-auto space-y-6">
+
+  <h1 class="text-2xl font-bold">Run Script Question</h1>
+
+  <!-- Submission Form -->
+  <div class="card bg-base-200">
+    <div class="card-body">
+      <form method="post" class="space-y-4" id="submission-form" novalidate>
+        {% csrf_token %}
+        <div class="hidden">
+          {{ form.code }}
+        </div>
+
+        <label class="form-control">
+          <div class="label">
+            <span class="label-text">Your solution (Python)</span>
+          </div>
+          <div id="monaco-editor"
+               class="w-full rounded-box ring-1 ring-base-300 bg-base-100"
+               style="height: 28rem;">
+          </div>
+        </label>
+
+        <div class="card-actions justify-end">
+          <button class="btn btn-primary">Run Tests</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Results -->
+  {% if results %}
+    {% if results.error %}
+      <div class="alert alert-error"><span>{{ results.error }}</span></div>
+    {% else %}
+      <div class="card bg-base-200">
+        <div class="card-body">
+          <div class="flex items-center gap-3">
+            <h2 class="card-title">Results</h2>
+            <div class="badge badge-success">Passed {{ results.passed }}/{{ results.total }}</div>
+            {% if results.failed %}<div class="badge badge-error">Failed {{ results.failed }}</div>{% endif %}
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="table table-zebra">
+              <thead>
+                <tr>
+                  <th>#</th><th>Input</th><th>Expected</th><th>Stdout</th><th>Stderr</th><th>Status</th><th>Timeout</th><th>RC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in results.results %}
+                <tr>
+                  <td class="align-top">{{ r.case }}</td>
+                  <td class="align-top"><pre class="text-xs">{{ r.input }}</pre></td>
+                  <td class="align-top"><pre class="text-xs">{{ r.expected }}</pre></td>
+                  <td class="align-top"><pre class="text-xs">{{ r.stdout }}</pre></td>
+                  <td class="align-top"><pre class="text-xs">{{ r.stderr }}</pre></td>
+                  <td class="align-top">
+                    {% if r.passed %}
+                      <span class="badge badge-success">Passed</span>
+                    {% else %}
+                      <span class="badge badge-error">Failed</span>
+                    {% endif %}
+                  </td>
+                  <td class="align-top">{{ r.timeout }}</td>
+                  <td class="align-top">{{ r.returncode }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
+</div>
+
+<!-- Monaco (for editing) -->
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+<script>
+  (function () {
+    const hiddenTextarea = document.getElementById("id_code");
+    const container = document.getElementById("monaco-editor");
+    if (hiddenTextarea) hiddenTextarea.removeAttribute('required');
+
+    function currentMonacoTheme() {
+      const theme = document.documentElement.getAttribute("data-theme") || "";
+      return /dark/i.test(theme) ? "vs-dark" : "vs";
+    }
+
+    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+    require(['vs/editor/editor.main'], function () {
+      const editor = monaco.editor.create(container, {
+        value: hiddenTextarea ? hiddenTextarea.value : "",
+        language: 'python',
+        theme: currentMonacoTheme(),
+        automaticLayout: true,
+        minimap: { enabled: false },
+        fontSize: 14,
+        wordWrap: 'on',
+      });
+
+      const ro = new ResizeObserver(() => editor.layout());
+      ro.observe(container);
+
+      const mo = new MutationObserver(() => {
+        monaco.editor.setTheme(currentMonacoTheme());
+        editor.layout();
+      });
+      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+      editor.onDidChangeModelContent(() => {
+        if (hiddenTextarea) hiddenTextarea.value = editor.getValue();
+      });
+      document.getElementById("submission-form").addEventListener("submit", function () {
+        if (hiddenTextarea) hiddenTextarea.value = editor.getValue();
+      });
+    });
+  })();
+</script>
+
+{% endblock %}
