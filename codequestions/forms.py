@@ -51,9 +51,9 @@ class CodeQuestionForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Default: hide both editors; we'll selectively enable one below
-        self.fields["tests_editor"].widget.attrs["style"] = "display:none"
-        self.fields["function_tests_editor"].widget.attrs["style"] = "display:none"
+        # Default: both editors hidden until we detect a type
+        self.fields["tests_editor"].widget = forms.HiddenInput()
+        self.fields["function_tests_editor"].widget = forms.HiddenInput()
 
         # Try to detect type from current YAML (initial or posted)
         yaml_text = self.initial.get("yaml_spec") or self.data.get(self.add_prefix("yaml_spec"), "")
@@ -79,12 +79,16 @@ class CodeQuestionForm(forms.ModelForm):
                             "stdout": t.get("stdout", "") or "",
                         })
 
-            self.fields["tests_editor"].widget.attrs.pop("style", None)
-            self.fields["tests_editor"].widget.attrs["data-active"] = "1"
-            # Seed the widget and remember initial JSON for change-detection
+            # Show ONLY the stdio editor
+            self.fields["tests_editor"].widget = StandardIoTestsWidget()
+            self.fields["tests_editor"].help_text = "Edit test cases for standard IO problems."
             initial_json = json.dumps(tests)
             self.initial["tests_editor"] = initial_json
             self._initial_stdio_json = initial_json
+
+            # Keep function editor hidden & empty to avoid accidental posts
+            self.initial["function_tests_editor"] = ""
+            self.fields["function_tests_editor"].widget = forms.HiddenInput()
 
         # ----- function -----
         elif isinstance(raw, dict) and raw.get("type") == "function":
@@ -149,13 +153,23 @@ class CodeQuestionForm(forms.ModelForm):
                             })
                     rows.append(base)
 
-            self.fields["function_tests_editor"].widget.attrs.pop("style", None)
-            self.fields["function_tests_editor"].widget.attrs["data-active"] = "1"
-            self.fields["function_tests_editor"].widget.attrs["data-arg-names"] = json.dumps(arg_names)
-            # Seed the widget and remember initial JSON for change-detection
+            # Show ONLY the function editor
+            self.fields["function_tests_editor"].widget = FunctionTestsWidget(attrs={
+                "data-arg-names": json.dumps(arg_names)
+            })
+            self.fields["function_tests_editor"].help_text = "Edit test cases for function problems."
             initial_json = json.dumps(rows)
             self.initial["function_tests_editor"] = initial_json
             self._initial_function_json = initial_json
+
+            # Keep stdio editor hidden & empty to avoid accidental posts
+            self.initial["tests_editor"] = ""
+            self.fields["tests_editor"].widget = forms.HiddenInput()
+
+        else:
+            # Unknown/invalid YAML: keep both editors hidden
+            self.initial["tests_editor"] = ""
+            self.initial["function_tests_editor"] = ""
 
     # ------------------ validation/compilation ------------------
 
@@ -263,10 +277,14 @@ class CodeQuestionForm(forms.ModelForm):
     @staticmethod
     def _is_standard_io_by_text(text: str) -> bool:
         try:
-            raw = next(yaml.safe_load_all(text))
+            raw = next(yyaml.safe_load_all(text))  # typo guard handled below
             return isinstance(raw, dict) and raw.get("type") == "standardIo"
         except Exception:
-            return False
+            try:
+                raw = next(yaml.safe_load_all(text))
+                return isinstance(raw, dict) and raw.get("type") == "standardIo"
+            except Exception:
+                return False
 
     @staticmethod
     def _is_function_by_text(text: str) -> bool:

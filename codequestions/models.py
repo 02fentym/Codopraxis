@@ -3,8 +3,6 @@ from django.db import models
 
 
 class CodeQuestion(models.Model):
-    # The new schema makes test_style and function_name fields redundant.
-    # The prompt field is now also part of the YAML.
     # We will store the entire YAML content in a single field.
     yaml_spec = models.TextField(
         help_text="The full problem definition in YAML format, including tests."
