@@ -1,12 +1,12 @@
 {% extends "main.html" %}
 {% load static %}
-{% block title %}Run Script Question{% endblock %}
+{% block title %}Run Question{% endblock %}
 {% block content %}
 
 <div class="max-w-5xl mx-auto space-y-6">
 
-    <h1 class="text-2xl font-bold">Run Script Question</h1>
-    <p class="text-lg text-base-content/50">{{ question.prompt|safe }}</p>
+    <h1 class="text-2xl font-bold">Run Question</h1>
+    <p class="text-lg text-base-content/50">{{ question.compiled_spec.description|safe }}</p>
     <!-- Submission Form -->
     <div class="card bg-base-200">
         <div class="card-body">

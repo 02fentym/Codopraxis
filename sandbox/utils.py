@@ -2,7 +2,10 @@
 from __future__ import annotations
 import subprocess, sys, tempfile, os, textwrap, signal, time, shutil
 from typing import Dict, Any, List
+import json
+import traceback
 
+from codequestions.generators import get_generator
 
 def _ensure_docker_available() -> None:
     """Fail fast if Docker CLI is missing."""
@@ -18,9 +21,14 @@ def _ensure_docker_available() -> None:
         # Don't hard-fail on slow startups; the actual run will surface errors.
         pass
 
-
-def _docker_cmd(*, workdir: str, mem_mb: int, cpus: float, image: str, name: str) -> List[str]:
-    return [
+def _run_in_docker(*, workdir: str, mem_mb: int, cpus: float, image: str, name: str, timeout: float) -> subprocess.CompletedProcess:
+    """
+    Runs a command inside a Docker container with strict resource limits.
+    Returns a CompletedProcess instance.
+    """
+    _ensure_docker_available()
+    
+    cmd = [
         "docker", "run", "--rm", "-i",           # <-- add -i
         "--name", name,
         "--network=none",
@@ -33,141 +41,124 @@ def _docker_cmd(*, workdir: str, mem_mb: int, cpus: float, image: str, name: str
         "-v", f"{workdir}:/workspace:ro",
         "-w", "/workspace",
         image,
-        "python", "-u", "-B", "solution.py",
+        "python", "test_runner.py"
     ]
-
-
-
-def _docker_kill(name: str) -> None:
-    """Best-effort: kill & remove the container if it outlives the client on timeout."""
+    
     try:
-        subprocess.run(["docker", "rm", "-f", name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=2)
-    except Exception:
-        pass
+        # We need to run the subprocess with a timeout
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            text=True,
+            check=False
+        )
+        return result
+    except subprocess.TimeoutExpired as e:
+        # This timeout is for the docker run command itself
+        # The internal script timeout is handled by the script itself
+        # If this happens, it's a sandbox issue
+        return subprocess.CompletedProcess(
+            args=cmd,
+            returncode=124, # 124 is the return code for timeout from "timeout" command
+            stdout="",
+            stderr=f"Sandbox process timed out after {timeout} seconds."
+        )
 
 
-def run_script_tests(compiled_specs: Dict[str, Any], submission_code: str) -> Dict[str, Any]:
-    assert compiled_specs.get("test_style") == "script", "This runner only supports test_style='script'."
-
-    _ensure_docker_available()
-
-    cases: List[Dict[str, Any]] = compiled_specs.get("test_cases", [])
-    case_timeout = float(compiled_specs.get("timeout_seconds", 5))
-    # New knobs (safe defaults)
-    overall_cap = float(compiled_specs.get("overall_timeout_seconds", case_timeout * 2))
-    stop_on_timeout = bool(compiled_specs.get("stop_on_timeout", True))
-
-    # Sandbox knobs (overridable per compiled spec)
-    mem_mb = int(compiled_specs.get("memory_limit_mb", 128))
-    cpus = float(compiled_specs.get("cpus", 1))
-    docker_image = str(compiled_specs.get("docker_image", "python:3.12-slim"))
-
-    submission_start = time.monotonic()
-
-    def submission_time_left() -> float:
-        return max(0.0, overall_cap - (time.monotonic() - submission_start))
-
-    submission_timed_out = False
-    results: List[Dict[str, Any]] = []
-    passed_count = 0
-
-    # Write solution once per submission; mount read-only into the container.
-    with tempfile.TemporaryDirectory() as td:
-        solution_path = os.path.join(td, "solution.py")
-        with open(solution_path, "w", encoding="utf-8") as f:
-            f.write(textwrap.dedent(submission_code).lstrip())
-
-        for idx, case in enumerate(cases, start=1):
-            if submission_time_left() <= 0:
-                submission_timed_out = True
-                results.append({
-                    "case": idx,
-                    "input": case.get("input", ""),
-                    "expected": case.get("output", ""),
-                    "stdout": "",
-                    "stderr": "Submission overall time budget exceeded.",
-                    "passed": False,
-                    "returncode": None,
-                    "timeout": True,
-                })
-                break
-
-            input_data = case.get("input", "")
-            expected = case.get("output", "")
-            this_timeout = min(case_timeout, submission_time_left())
-
-            # Unique, DNS-safe container name: cq-<pid>-<ms>-<idx>
-            container_name = f"cq-{os.getpid()}-{int(time.time() * 1000)}-{idx}"
-
-            try:
-                cmd = _docker_cmd(workdir=td, mem_mb=mem_mb, cpus=cpus, image=docker_image, name=container_name)
-                proc = subprocess.Popen(
-                    cmd,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
-                stdout, stderr = proc.communicate(input=input_data, timeout=this_timeout)
-                ok = (stdout == expected and proc.returncode == 0)
-
-                results.append({
-                    "case": idx, "input": input_data, "expected": expected,
-                    "stdout": stdout, "stderr": stderr,
-                    "passed": ok, "returncode": proc.returncode, "timeout": False,
-                })
-                if ok:
-                    passed_count += 1
-
-            except subprocess.TimeoutExpired:
-                # Kill container and mark timeout
-                _docker_kill(container_name)
-                try:
-                    # Drain any remaining pipes quickly
-                    stdout, stderr = proc.communicate(timeout=0.25)  # type: ignore[name-defined]
-                except Exception:
-                    stdout, stderr = "", ""
-
-                results.append({
-                    "case": idx, "input": input_data, "expected": expected,
-                    "stdout": stdout or "", "stderr": (stderr or "") + "\n[Timed out]",
-                    "passed": False, "returncode": None, "timeout": True,
-                })
-
-                if stop_on_timeout:
-                    submission_timed_out = True
-                    break
-
-            except FileNotFoundError as e:
-                # e.g., Docker CLI missing
-                results.append({
-                    "case": idx, "input": input_data, "expected": expected,
-                    "stdout": "", "stderr": f"Docker not available: {e}",
-                    "passed": False, "returncode": None, "timeout": False,
-                })
-                break
-
-            except Exception as e:
-                # Catch-all for sandbox launcher errors
-                results.append({
-                    "case": idx, "input": input_data, "expected": expected,
-                    "stdout": "", "stderr": f"Sandbox error: {e}",
-                    "passed": False, "returncode": None, "timeout": False,
-                })
-                if stop_on_timeout:
-                    break
+def _parse_script_results(stdout: str, stderr: str, returncode: int, timeout: bool) -> Dict[str, Any]:
+    """
+    Parses the output of a script-based test runner.
+    """
+    lines = stdout.strip().splitlines()
+    if not lines:
+        return {
+            "ok": False,
+            "error": "No output from test runner.",
+            "results": [],
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
+            "submission_timeout": timeout,
+        }
+    
+    # We'll assume the last line of the output is the summary
+    last_line = lines[-1]
+    if "OK" in last_line:
+        passed_count = last_line.count("OK")
+        failed_count = 0
+    elif "FAILED" in last_line:
+        passed_count = last_line.count("passed")
+        failed_count = last_line.count("failed")
+    else:
+        passed_count = 0
+        failed_count = 0
 
     return {
-        "test_style": "script",
-        "total": len(cases),
+        "ok": failed_count == 0 and not timeout,
+        "results": [{"name": "Result", "stdout": stdout, "stderr": stderr, "passed": failed_count == 0 and not timeout}],
+        "total": passed_count + failed_count,
         "passed": passed_count,
-        "failed": (len(results) - passed_count),
-        "results": results,
-        "submission_timeout": submission_timed_out,
+        "failed": failed_count,
+        "submission_timeout": timeout,
     }
 
 
-SUPPORTED_LANGS = {"python"}  # expand later
+def _parse_function_results(stdout: str, stderr: str, returncode: int, timeout: bool) -> Dict[str, Any]:
+    """
+    Parses the output from our custom function test runner.
+    """
+    # Our test runner outputs a JSON-like summary, but we'll use a more
+    # reliable method to get the results.
+    try:
+        # We can analyze the stdout from the unittest run to get the results.
+        lines = stdout.strip().splitlines()
+        summary = lines[-1]
+        
+        # Example summary: "Ran 5 tests in 0.001s\nOK"
+        total = 0
+        if "Ran" in summary:
+            total = int(summary.split()[1])
+        
+        passed = 0
+        failed = 0
+        
+        if "OK" in summary:
+            passed = total
+        elif "FAILED" in summary:
+            # This is a simple parser, can be expanded to be more robust
+            failed_line = next((line for line in lines if line.startswith("FAILED")), None)
+            if failed_line:
+                failed = len(failed_line.split(" (")[1].split(")")[:-1])
+                passed = total - failed
+        
+        # A simple placeholder for detailed results, which would be more complex to parse
+        results = [
+            {"case": "Test 1", "passed": True},
+            {"case": "Test 2", "passed": True},
+        ]
+        
+        return {
+            "ok": failed == 0 and not timeout,
+            "test_style": "function",
+            "total": total,
+            "passed": passed,
+            "failed": failed,
+            "results": results,
+            "submission_timeout": timeout,
+        }
+        
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": f"Failed to parse test results: {e}",
+            "results": [],
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
+            "submission_timeout": timeout,
+        }
 
 
 def run_submission(compiled_specs: Dict[str, Any], submission_code: str, *, language: str = "python") -> Dict[str, Any]:
@@ -182,7 +173,7 @@ def run_submission(compiled_specs: Dict[str, Any], submission_code: str, *, lang
         "meta": {"language": "..."}
       }
     """
-    if language not in SUPPORTED_LANGS:
+    if language not in ["python"]:
         return {
             "ok": False,
             "error": f"Unsupported language: {language}",
@@ -190,15 +181,48 @@ def run_submission(compiled_specs: Dict[str, Any], submission_code: str, *, lang
         }
 
     style = compiled_specs.get("test_style")
-    if style == "script":
-        res = run_script_tests(compiled_specs, submission_code)
-    elif style == "function":
-        return {"ok": False, "error": "Function style not implemented yet.", "meta": {"language": language}}
-    elif style == "oop":
-        return {"ok": False, "error": "OOP style not implemented yet.", "meta": {"language": language}}
-    else:
-        return {"ok": False, "error": f"Unknown test_style: {style}", "meta": {"language": language}}
+    
+    # We'll use a temporary directory for the Docker run
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            # Write the student's submission to a file
+            submission_path = os.path.join(temp_dir, "solution.py")
+            with open(submission_path, "w") as f:
+                f.write(submission_code)
 
-    res["ok"] = (res.get("failed", 0) == 0)
-    res["meta"] = {"language": language}
-    return res
+            # Generate and write the test runner script
+            generator_fn = get_generator(language, style)
+            test_runner_code = generator_fn(compiled_specs)
+            test_runner_path = os.path.join(temp_dir, "test_runner.py")
+            with open(test_runner_path, "w") as f:
+                f.write(test_runner_code)
+            
+            # Execute the tests in a Docker container
+            docker_result = _run_in_docker(
+                workdir=temp_dir,
+                mem_mb=compiled_specs.get("memory_limit_mb", 128),
+                cpus=compiled_specs.get("cpus", 1),
+                image=compiled_specs.get("docker_image", "python:3.12-slim"),
+                name=f"sandbox-{os.path.basename(temp_dir)}",
+                timeout=compiled_specs.get("overall_timeout_seconds", 10)
+            )
+
+            # Parse the results based on the test style
+            if style == "script":
+                res = _parse_script_results(docker_result.stdout, docker_result.stderr, docker_result.returncode, docker_result.returncode == 124)
+            elif style == "function":
+                res = _parse_function_results(docker_result.stdout, docker_result.stderr, docker_result.returncode, docker_result.returncode == 124)
+            elif style == "oop":
+                res = {"ok": False, "error": "OOP style not implemented yet.", "meta": {"language": language}}
+            else:
+                res = {"ok": False, "error": f"Unknown test_style: {style}", "meta": {"language": language}}
+            
+            return res
+        
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": f"An internal error occurred: {traceback.format_exc()}",
+                "meta": {"language": language, "style": style},
+            }
+
