@@ -277,7 +277,7 @@ class CodeQuestionForm(forms.ModelForm):
     @staticmethod
     def _is_standard_io_by_text(text: str) -> bool:
         try:
-            raw = next(yyaml.safe_load_all(text))  # typo guard handled below
+            raw = next(yaml.safe_load_all(text))  # typo guard handled below
             return isinstance(raw, dict) and raw.get("type") == "standardIo"
         except Exception:
             try:
