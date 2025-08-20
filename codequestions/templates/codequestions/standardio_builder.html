@@ -1,0 +1,472 @@
+{% extends "main.html" %}
+{% block title %}Standard I/O Builder{% endblock %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Breadcrumbs -->
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li><a href="{% url 'home' %}" class="link">Home</a></li>
+            <li><span class="opacity-70">Code Questions</span></li>
+            <li class="font-semibold">Standard I/O Builder</li>
+        </ul>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Left: Builder Card -->
+        <div class="card bg-base-200">
+            <div class="card-body space-y-6">
+                <h1 class="card-title text-3xl">Standard I/O Builder</h1>
+                <p class="opacity-70">Define the problem without touching YAML. We’ll turn it into a compiled spec.</p>
+
+                <form id="builder-form" method="post" class="space-y-6">
+                    {% csrf_token %}
+
+                    <!-- Description -->
+                    <div class="form-control">
+                        <label class="label block">
+                            <span class="label-text font-medium">
+                                Description <span class="opacity-60 text-xs">(shown to students)</span>
+                            </span>
+                        </label>
+                        <textarea id="description" name="description"
+                            class="textarea textarea-bordered bg-base-100 w-full h-36"
+                            placeholder="Add two numbers together"></textarea>
+                    </div>
+
+                    <!-- Tests container (JS will render tests here) -->
+                    <div id="testsContainer" class="space-y-6"></div>
+
+                    <!-- Add Test -->
+                    <div class="flex gap-2">
+                        <button id="addTestBtn" type="button" class="btn btn-outline">+ Add Test</button>
+                        <button class="btn btn-primary btn-disabled" disabled>Save (coming soon)</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right: Compiled Spec (Preview) -->
+        <div class="card bg-base-200 lg:sticky lg:top-6 h-fit">
+            <div class="card-body">
+                <h2 class="card-title text-2xl mb-2">Compiled Spec (Preview)</h2>
+
+                <div class="mockup-code text-xs bg-base-100">
+                    <pre><code id="specPreview">{
+          "version": 1,
+          "type": "standardIo",
+          "description": "",
+          "tests": []
+        }</code></pre>
+                </div>
+
+                <!-- Copy and Validate JSON button -->
+                <div class="mt-2 flex items-center gap-2">
+                    <button id="copyJsonBtn" type="button" class="btn btn-outline btn-sm">Copy JSON</button>
+                    <button id="validateBtn" type="button" class="btn btn-primary btn-sm">Validate JSON</button>
+                    <span id="newlineBadge" class="badge badge-outline hidden">some stdout will include \n</span>
+                </div>
+
+                <!-- Toasts -->
+                <div id="toastOk" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-success"><span>Spec is valid.</span></div>
+                </div>
+                <div id="toastErr" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-error"><span>Spec has issues. See console.</span></div>
+                </div>
+
+
+                <!-- DaisyUI toast -->
+                <div id="toast" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-success">
+                        <span>Copied to clipboard.</span>
+                    </div>
+                </div>
+
+
+                <div class="mt-2">
+                    <span id="newlineBadge" class="badge badge-outline hidden">some stdout will include \n</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ----- DOM refs -----
+  const descriptionEl = $("description");
+  const testsContainer = $("testsContainer");
+  const previewEl = $("specPreview");
+  const newlineBadge = $("newlineBadge");
+  const addTestBtn = $("addTestBtn");
+
+  const copyBtn  = document.getElementById("copyJsonBtn");
+  const toastEl  = document.getElementById("toast");     // optional (for copy)
+  const validateBtn = document.getElementById("validateBtn");
+  const toastOk  = document.getElementById("toastOk");   // success (validate)
+  const toastErr = document.getElementById("toastErr");  // error (validate)
+
+  // ----- State -----
+  let tests = [
+    { name: "test1", stdin: "", stdout: "" }
+  ];
+
+  // ----- Utilities -----
+  function show(el, ms = 1800) {
+    if (!el) return;
+    el.classList.remove("hidden");
+    setTimeout(() => el.classList.add("hidden"), ms);
+  }
+
+  function getCookie(name) {
+    const v = document.cookie.split("; ").find(row => row.startsWith(name + "="));
+    return v ? decodeURIComponent(v.split("=")[1]) : null;
+  }
+  const csrftoken = getCookie("csrftoken");
+
+  function sectionNodes() {
+    return [...testsContainer.querySelectorAll("[data-test-index]")];
+  }
+
+  function clearInlineErrors(section) {
+    const nameEl   = section.querySelector('[data-role="name"]');
+    const stdinEl  = section.querySelector('[data-role="stdin"]');
+    const stdoutEl = section.querySelector('[data-role="stdout"]');
+    const errName  = section.querySelector('[data-err="name"]');
+    const errStdin = section.querySelector('[data-err="stdin"]');
+    const errStdout= section.querySelector('[data-err="stdout"]');
+
+    [nameEl, stdinEl, stdoutEl].forEach(el => el && el.classList.remove("input-error","textarea-error"));
+    [errName, errStdin, errStdout].forEach(el => { if (el){ el.textContent = ""; el.classList.add("hidden"); }});
+  }
+
+  function showFieldError(section, field, message) {
+    const map = {
+      name:   { inputSel: '[data-role="name"]',   errSel: '[data-err="name"]',   errorClass: 'input-error'   },
+      stdin:  { inputSel: '[data-role="stdin"]',  errSel: '[data-err="stdin"]',  errorClass: 'textarea-error'},
+      stdout: { inputSel: '[data-role="stdout"]', errSel: '[data-err="stdout"]', errorClass: 'input-error'   },
+    };
+    const cfg = map[field];
+    if (!cfg) return;
+    const input = section.querySelector(cfg.inputSel);
+    const err   = section.querySelector(cfg.errSel);
+    if (input) input.classList.add(cfg.errorClass);
+    if (err) { err.textContent = message; err.classList.remove("hidden"); }
+  }
+
+  // Unique name helper for duplication
+  function makeUniqueName(base) {
+    const existing = new Set(tests.map(t => (t.name || "").trim()).filter(Boolean));
+    let candidate = base.trim() || "test";
+    if (!existing.has(candidate)) return candidate;
+    // try "-copy", "-copy-2", "-copy-3", ...
+    let i = 1;
+    while (existing.has(`${candidate}-copy${i > 1 ? "-" + i : ""}`)) i++;
+    return `${candidate}-copy${i > 1 ? "-" + i : ""}`;
+  }
+
+  // ----- Renderers -----
+  function testSectionTemplate(idx, test) {
+    const n = idx + 1;
+    const stdinId  = `stdin_${n}`;
+    const stdoutId = `stdout_${n}`;
+    const nameId   = `name_${n}`;
+
+    return `
+      <div class="space-y-3 border border-base-100 rounded-box p-4" data-test-index="${idx}">
+        <div class="flex items-center justify-between">
+          <div class="divider my-0 w-auto">Test #${n}</div>
+          <div class="flex items-center gap-1">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicateTest">Duplicate</button>
+            <button type="button" class="btn btn-ghost btn-sm text-error" data-action="removeTest"${tests.length === 1 ? ' disabled' : ''}>
+              Remove
+            </button>
+          </div>
+        </div>
+
+        <!-- Test name -->
+        <div class="form-control">
+          <label class="label block">
+            <span class="label-text font-semibold">Test name</span>
+          </label>
+          <input id="${nameId}" data-role="name" type="text" class="input input-bordered w-full"
+                 placeholder="test${n}" value="${test.name || `test${n}`}" />
+          <p class="text-error text-xs mt-1 hidden" data-err="name"></p>
+          <label class="label">
+            <span class="label-text-alt opacity-70">Unique within this question.</span>
+          </label>
+        </div>
+
+        <!-- stdin -->
+        <div class="form-control">
+          <label class="label block">
+            <span class="label-text font-semibold">stdin</span>
+          </label>
+          <textarea id="${stdinId}" data-role="stdin" class="textarea textarea-bordered bg-base-100 w-full h-28"
+                    placeholder="5&#10;4">${test.stdin ?? ""}</textarea>
+          <p class="text-error text-xs mt-1 hidden" data-err="stdin"></p>
+          <label class="label">
+            <span class="label-text-alt opacity-70">Multiline OK. Piped to the program’s stdin.</span>
+          </label>
+        </div>
+
+        <!-- stdout -->
+        <div class="form-control">
+          <label class="label block">
+            <span class="label-text font-semibold">stdout</span>
+          </label>
+          <input id="${stdoutId}" data-role="stdout" type="text" class="input input-bordered w-full"
+                 placeholder="9" value="${(test.stdout ?? "").replace(/\n$/, "")}" />
+          <p class="text-error text-xs mt-1 hidden" data-err="stdout"></p>
+          <label class="label">
+            <span class="label-text-alt opacity-70">We’ll ensure a trailing newline (<code>\\n</code>) in the spec.</span>
+          </label>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTests() {
+    testsContainer.innerHTML = tests.map((t, i) => testSectionTemplate(i, t)).join("");
+  }
+
+  // ----- State coercion & spec -----
+  function coerceStateFromDOM() {
+    const sections = sectionNodes();
+    tests = sections.map((section, i) => {
+      const nameEl   = section.querySelector('[data-role="name"]');
+      const stdinEl  = section.querySelector('[data-role="stdin"]');
+      const stdoutEl = section.querySelector('[data-role="stdout"]');
+
+      const rawStdout = (stdoutEl.value || "");
+      const stdout = rawStdout ? (rawStdout.endsWith("\n") ? rawStdout : rawStdout + "\n") : "";
+      return {
+        name: (nameEl.value || `test${i+1}`).trim(),
+        stdin: stdinEl.value || "",
+        stdout: stdout
+      };
+    });
+  }
+
+  function hasContent(t) {
+    return (t.stdin && t.stdin.length) || (t.stdout && t.stdout.length);
+  }
+
+  function buildSpec() {
+    coerceStateFromDOM();
+    // Only include tests with any content
+    const filtered = tests.filter(hasContent);
+    return {
+      version: 1,
+      type: "standardIo",
+      description: descriptionEl.value || "",
+      tests: filtered
+    };
+  }
+
+  // ----- Client-side validation -----
+  function validateClient() {
+    const sections = sectionNodes();
+    let anyNeedsNewline = false;
+    let isValid = true;
+
+    // Count names for uniqueness
+    const nameCounts = {};
+    sections.forEach((section) => {
+      const nameEl = section.querySelector('[data-role="name"]');
+      const name = (nameEl.value || "").trim();
+      if (name) nameCounts[name] = (nameCounts[name] || 0) + 1;
+    });
+
+    sections.forEach((section) => {
+      clearInlineErrors(section);
+
+      const nameEl   = section.querySelector('[data-role="name"]');
+      const stdinEl  = section.querySelector('[data-role="stdin"]');
+      const stdoutEl = section.querySelector('[data-role="stdout"]');
+
+      const name = (nameEl.value || "").trim();
+      const rawStdout = (stdoutEl.value || "");
+      const contentPresent = (stdinEl.value && stdinEl.value.length) || rawStdout.length;
+
+      // Name required & unique
+      if (!name) {
+        isValid = false;
+        showFieldError(section, "name", "Test name is required.");
+      } else if (nameCounts[name] > 1) {
+        isValid = false;
+        showFieldError(section, "name", "Test name must be unique.");
+      }
+
+      // stdout required if there is any content
+      if (contentPresent && rawStdout.trim().length === 0) {
+        isValid = false;
+        showFieldError(section, "stdout", "stdout is required when a test has input/output.");
+      }
+
+      if (rawStdout && !rawStdout.endsWith("\n")) {
+        anyNeedsNewline = true;
+      }
+    });
+
+    newlineBadge.classList.toggle("hidden", !anyNeedsNewline);
+    return isValid;
+  }
+
+  // ----- Server-side errors -> inline surfacing -----
+  function applyServerErrors(errors) {
+    // Clear prior server errors
+    sectionNodes().forEach(clearInlineErrors);
+
+    Object.keys(errors || {}).forEach(key => {
+      const match = key.match(/^tests\[(\d+)\]$/);
+      if (!match) return;
+      const idx = parseInt(match[1], 10);
+      const section = sectionNodes()[idx];
+      if (!section) return;
+
+      const tErr = errors[key];
+      if (tErr && typeof tErr === "object") {
+        if (tErr.name)   showFieldError(section, "name",   tErr.name);
+        if (tErr.stdin)  showFieldError(section, "stdin",  tErr.stdin);
+        if (tErr.stdout) showFieldError(section, "stdout", tErr.stdout);
+      }
+    });
+
+    const firstErr = testsContainer.querySelector(".text-error:not(.hidden)");
+    if (firstErr) firstErr.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  // ----- Preview render -----
+  function renderPreview() {
+    validateClient(); // inline client errors
+    previewEl.textContent = JSON.stringify(buildSpec(), null, 2);
+  }
+
+  // ----- Events -----
+  testsContainer.addEventListener("input", renderPreview);
+  testsContainer.addEventListener("change", renderPreview);
+
+  testsContainer.addEventListener("click", function (e) {
+    const section = e.target.closest("[data-test-index]");
+    if (!section) return;
+    const idx = parseInt(section.dataset.testIndex, 10);
+
+    // Remove
+    const removeBtn = e.target.closest("[data-action='removeTest']");
+    if (removeBtn) {
+      if (tests.length <= 1) return;
+      tests.splice(idx, 1);
+      // Re-number default names only if they match "testN"
+      tests = tests.map((t, i) => ({
+        ...t,
+        name: t.name && /^test\d+$/.test(t.name) ? `test${i+1}` : t.name
+      }));
+      renderTests();
+      renderPreview();
+      return;
+    }
+
+    // Duplicate
+    const dupBtn = e.target.closest("[data-action='duplicateTest']");
+    if (dupBtn) {
+      // Read raw values from DOM so we don't double-append newline
+      const nameEl   = section.querySelector('[data-role="name"]');
+      const stdinEl  = section.querySelector('[data-role="stdin"]');
+      const stdoutEl = section.querySelector('[data-role="stdout"]');
+
+      const baseName = (nameEl.value || `test${idx+1}`).trim();
+      const newName  = makeUniqueName(baseName || `test${idx+1}`);
+
+      // Create a new test object; keep stdout as entered (no newline),
+      // our coerce/buildSpec handles normalizing to include \n.
+      const newTest = {
+        name: newName,
+        stdin: stdinEl.value || "",
+        stdout: (stdoutEl.value || "")
+      };
+
+      tests.splice(idx + 1, 0, newTest);
+      renderTests();
+      renderPreview();
+
+      // Focus the duplicated test name for quick edits
+      const newSection = sectionNodes()[idx + 1];
+      const newNameInput = newSection?.querySelector('[data-role="name"]');
+      if (newNameInput) newNameInput.focus();
+    }
+  });
+
+  addTestBtn.addEventListener("click", function () {
+    const next = tests.length + 1;
+    tests.push({ name: `test${next}`, stdin: "", stdout: "" });
+    renderTests();
+    renderPreview();
+  });
+
+  ["input", "change"].forEach(evt => descriptionEl.addEventListener(evt, renderPreview));
+
+  // Copy JSON
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(previewEl.textContent);
+        show(toastEl); // success toast for copy (if present)
+      } catch (e) {
+        const tmp = document.createElement("textarea");
+        tmp.value = previewEl.textContent;
+        document.body.appendChild(tmp);
+        tmp.select();
+        document.execCommand("copy");
+        document.body.removeChild(tmp);
+        show(toastEl);
+      }
+    });
+  }
+
+  // Validate JSON (server)
+  if (validateBtn) {
+    validateBtn.addEventListener("click", async () => {
+      // Ensure preview/spec is current & clear prior errors
+      renderPreview();
+      sectionNodes().forEach(clearInlineErrors);
+
+      const specText = previewEl.textContent;
+      try {
+        const res = await fetch("{% url 'standardio-validate' %}", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrftoken
+          },
+          body: specText
+        });
+        if (!res.ok) throw new Error("Network error");
+        const data = await res.json();
+
+        if (data.ok) {
+          show(toastOk);
+        } else {
+          applyServerErrors(data.errors || {});
+          show(toastErr);
+        }
+      } catch (e) {
+        console.error(e);
+        show(toastErr);
+      }
+    });
+  }
+
+  // ----- Initial render -----
+  renderTests();
+  renderPreview();
+})();
+</script>
+
+
+
+
+{% endblock %}
