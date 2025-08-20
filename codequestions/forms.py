@@ -10,7 +10,7 @@ from django.db import transaction
 
 from .models import CodeQuestion
 from .spec_compiler import compile_yaml_to_spec, SpecError
-from .widgets import StandardIoTestsWidget, FunctionTestsWidget
+from .widgets import StandardIoTestsWidget, FunctionTestsWidget, OopTestsWidget
 
 
 class CodeQuestionForm(forms.ModelForm):
@@ -30,6 +30,19 @@ class CodeQuestionForm(forms.ModelForm):
         label="Tests Editor (function)",
     )
 
+    # Editor for OOP tests (expects rows of {name, setup:[], steps:[]})
+    # The widget should output JSON shaped roughly like compiled_spec["tests"] entries for OOP:
+    #   { "name": "...",
+    #     "setup": [{"op":"create","class":"ShoppingCart","as":"cart"}],
+    #     "steps": [{"op":"call","on":"cart","method":"add","args":["apple",1.5], "expected": ... | "exception": {...}}]
+    #   }
+    oop_tests_editor = forms.CharField(
+        required=False,
+        widget=OopTestsWidget,
+        help_text="Edit test cases for OOP problems (setup & steps).",
+        label="Tests Editor (oop)",
+    )
+
     class Meta:
         model = CodeQuestion
         fields = [
@@ -47,13 +60,15 @@ class CodeQuestionForm(forms.ModelForm):
     # to detect if user actually edited the editor widgets
     _initial_stdio_json: str | None = None
     _initial_function_json: str | None = None
+    _initial_oop_json: str | None = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Default: both editors hidden until we detect a type
+        # Default: all editors hidden until we detect a type
         self.fields["tests_editor"].widget = forms.HiddenInput()
         self.fields["function_tests_editor"].widget = forms.HiddenInput()
+        self.fields["oop_tests_editor"].widget = forms.HiddenInput()
 
         # Try to detect type from current YAML (initial or posted)
         yaml_text = self.initial.get("yaml_spec") or self.data.get(self.add_prefix("yaml_spec"), "")
@@ -86,9 +101,9 @@ class CodeQuestionForm(forms.ModelForm):
             self.initial["tests_editor"] = initial_json
             self._initial_stdio_json = initial_json
 
-            # Keep function editor hidden & empty to avoid accidental posts
+            # keep others hidden/empty
             self.initial["function_tests_editor"] = ""
-            self.fields["function_tests_editor"].widget = forms.HiddenInput()
+            self.initial["oop_tests_editor"] = ""
 
         # ----- function -----
         elif isinstance(raw, dict) and raw.get("type") == "function":
@@ -162,14 +177,57 @@ class CodeQuestionForm(forms.ModelForm):
             self.initial["function_tests_editor"] = initial_json
             self._initial_function_json = initial_json
 
-            # Keep stdio editor hidden & empty to avoid accidental posts
+            # keep others hidden/empty
             self.initial["tests_editor"] = ""
-            self.fields["tests_editor"].widget = forms.HiddenInput()
+            self.initial["oop_tests_editor"] = ""
 
-        else:
-            # Unknown/invalid YAML: keep both editors hidden
+        # ----- oop -----
+        elif isinstance(raw, dict) and raw.get("type") == "oop":
+            self._detected_type = "oop"
+
+            # Seed rows from compiled_spec if present; else pass through YAML tests
+            rows = []
+            if (
+                self.instance
+                and self.instance.pk
+                and self.instance.compiled_spec
+                and self.instance.compiled_spec.get("type") == "oop"
+            ):
+                # compiled_spec already normalized to setup/steps; we can reuse as-is
+                for t in self.instance.compiled_spec.get("tests", []):
+                    rows.append({
+                        "name": t.get("name", "case"),
+                        "setup": t.get("setup", []),
+                        "steps": t.get("steps", []),
+                    })
+            else:
+                for t in (raw.get("tests") or []):
+                    if not isinstance(t, dict):
+                        continue
+                    # pass through any author-provided structure; widget should edit this JSON
+                    rows.append({
+                        "name": t.get("name", "case"),
+                        "setup": t.get("setup", []),
+                        # YAML uses 'actions'; compiled uses 'steps' — prefer actions if present
+                        "steps": t.get("steps") or t.get("actions") or [],
+                    })
+
+            # Show ONLY the oop editor
+            self.fields["oop_tests_editor"].widget = OopTestsWidget()
+            self.fields["oop_tests_editor"].help_text = "Edit test cases for OOP problems (setup & steps)."
+            initial_json = json.dumps(rows)
+            self.initial["oop_tests_editor"] = initial_json
+            self._initial_oop_json = initial_json
+
+            # keep others hidden/empty
             self.initial["tests_editor"] = ""
             self.initial["function_tests_editor"] = ""
+
+        else:
+            # Unknown/invalid YAML: keep all editors hidden
+            self.initial["tests_editor"] = ""
+            self.initial["function_tests_editor"] = ""
+            self.initial["oop_tests_editor"] = ""
 
     # ------------------ validation/compilation ------------------
 
@@ -230,7 +288,6 @@ class CodeQuestionForm(forms.ModelForm):
                             outcome = (r.get("outcome") or "expected").strip().lower()
                             if outcome == "expected":
                                 exp = r.get("expected", "")
-                                # Only include 'expected' if not blank; otherwise omit to avoid clobbering YAML
                                 if not (isinstance(exp, str) and exp.strip() == ""):
                                     entry["expected"] = parse_scalar(exp)
                             else:
@@ -245,6 +302,71 @@ class CodeQuestionForm(forms.ModelForm):
                         text = yaml.safe_dump(raw, sort_keys=False, allow_unicode=True)
                 except Exception as e:
                     raise forms.ValidationError(f"Function tests editor error: {e}")
+
+        # ----- oop -----
+        elif self._is_oop_by_text(text):
+            editor_json = self.data.get(self.add_prefix("oop_tests_editor"), "")
+            editor_changed = bool(editor_json) and editor_json != (self._initial_oop_json or "")
+            if editor_json and editor_changed:
+                try:
+                    rows = json.loads(editor_json) or []
+                    if self._oop_rows_meaningful(rows):
+                        raw = next(yaml.safe_load_all(text))
+
+                        # Expect rows shaped like the compiled OOP tests:
+                        # {name, setup:[{op,class,as}], steps:[{op:'call',on,method,args, expected?|exception?}]}
+                        # Convert back to YAML author's shape: setup is same; steps become 'actions'
+                        new_tests = []
+                        for r in rows:
+                            name = r.get("name") or "case"
+                            setup = r.get("setup") or []
+                            steps = r.get("steps") or []
+
+                            # Basic validation of step shape; leave details to spec_compiler later
+                            actions = []
+                            for s in steps:
+                                if not isinstance(s, dict):
+                                    continue
+                                if s.get("op") == "call":
+                                    a = {
+                                        "action": "call",
+                                        "var": s.get("on"),
+                                        "method": s.get("method"),
+                                    }
+                                    # args array back to an args mapping is not needed here
+                                    # (the YAML expects mapping keyed by method args; we don't have sig here)
+                                    # We keep it as list; spec_compiler will validate positions vs signature later.
+                                    if "args" in s:
+                                        a["args"] = s["args"]
+                                    if "expected" in s:
+                                        a["expected"] = s["expected"]
+                                    if "exception" in s:
+                                        a["exception"] = s["exception"]
+                                    actions.append(a)
+                                elif s.get("op") == "create":
+                                    # If widget allowed 'create' in steps, map to setup-style create
+                                    actions.append({
+                                        "action": "create",
+                                        "class": s.get("class"),
+                                        "var": s.get("as"),
+                                    })
+                                else:
+                                    # unknown op: pass through minimally
+                                    actions.append(s)
+
+                            new_tests.append({
+                                "name": name,
+                                "setup": [
+                                    {"action": "create", "class": c.get("class"), "var": c.get("as")}
+                                    for c in (setup or []) if isinstance(c, dict) and c.get("op") == "create"
+                                ],
+                                "actions": actions,
+                            })
+
+                        raw["tests"] = new_tests
+                        text = yaml.safe_dump(raw, sort_keys=False, allow_unicode=True)
+                except Exception as e:
+                    raise forms.ValidationError(f"OOP tests editor error: {e}")
 
         # Compile (with possibly updated YAML)
         try:
@@ -277,14 +399,10 @@ class CodeQuestionForm(forms.ModelForm):
     @staticmethod
     def _is_standard_io_by_text(text: str) -> bool:
         try:
-            raw = next(yaml.safe_load_all(text))  # typo guard handled below
+            raw = next(yaml.safe_load_all(text))
             return isinstance(raw, dict) and raw.get("type") == "standardIo"
         except Exception:
-            try:
-                raw = next(yaml.safe_load_all(text))
-                return isinstance(raw, dict) and raw.get("type") == "standardIo"
-            except Exception:
-                return False
+            return False
 
     @staticmethod
     def _is_function_by_text(text: str) -> bool:
@@ -295,9 +413,17 @@ class CodeQuestionForm(forms.ModelForm):
             return False
 
     @staticmethod
+    def _is_oop_by_text(text: str) -> bool:
+        try:
+            raw = next(yaml.safe_load_all(text))
+            return isinstance(raw, dict) and raw.get("type") == "oop"
+        except Exception:
+            return False
+
+    @staticmethod
     def _stdio_rows_meaningful(rows: list) -> bool:
         """
-        Returns True if any stdio row has a non-empty stdin or stdout, or a non-default name.
+        True if any stdio row has non-empty stdin/stdout or a non-default name.
         Prevents clobbering YAML with empty default UI rows.
         """
         for r in rows or []:
@@ -305,7 +431,6 @@ class CodeQuestionForm(forms.ModelForm):
                 continue
             if (str(r.get("stdin", "")).strip() != "") or (str(r.get("stdout", "")).strip() != ""):
                 return True
-            # also treat a custom name as meaningful
             if (r.get("name") or "").strip() not in {"", "case", "case1", "baseCase"}:
                 return True
         return False
@@ -313,25 +438,37 @@ class CodeQuestionForm(forms.ModelForm):
     @staticmethod
     def _function_rows_meaningful(rows: list) -> bool:
         """
-        Returns True if any function row has any arg filled, or expected set, or exception chosen.
-        Prevents accidental overwrite when the editor posts default/empty rows.
+        True if any function row has any arg filled, or expected set, or exception chosen.
         """
         for r in rows or []:
             if not isinstance(r, dict):
                 continue
-            # any arg filled?
             args = r.get("args") or {}
             for v in args.values():
                 if str(v).strip() != "":
                     return True
-            # expected filled?
             exp = r.get("expected", None)
             if exp is not None and str(exp).strip() != "":
                 return True
-            # exception chosen?
             if (r.get("outcome") or "").lower() == "exception":
                 et = (r.get("exception_type") or "").strip()
                 em = (r.get("exception_message") or "").strip()
                 if et or em:
                     return True
+        return False
+
+    @staticmethod
+    def _oop_rows_meaningful(rows: list) -> bool:
+        """
+        True if any oop row has a non-empty setup or steps list (or a non-default name).
+        """
+        for r in rows or []:
+            if not isinstance(r, dict):
+                continue
+            setup = r.get("setup") or []
+            steps = r.get("steps") or []
+            if (isinstance(setup, list) and len(setup) > 0) or (isinstance(steps, list) and len(steps) > 0):
+                return True
+            if (r.get("name") or "").strip() not in {"", "case", "case1", "baseCase"}:
+                return True
         return False

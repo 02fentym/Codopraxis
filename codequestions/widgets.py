@@ -370,3 +370,183 @@ class FunctionTestsWidget(Widget):
 }})();
 </script>
 """)
+
+
+
+#### OOP ####
+# codequestions/widgets.py (add this class)
+from django.forms.widgets import Widget
+from django.utils.safestring import mark_safe
+import json
+import html
+
+class OopTestsWidget(Widget):
+    """
+    OOP tests editor.
+    Each row captures:
+      - name: str
+      - setup: JSON array (e.g., [{"op":"create","class":"ShoppingCart","as":"cart"}])
+      - steps: JSON array (e.g., [{"op":"call","on":"cart","method":"add","args":["apple",1.5],"expected":...}])
+
+    Value stored in the hidden input is a JSON list of these rows.
+    """
+    def render(self, name, value, attrs=None, renderer=None):
+        rows = []
+        if value:
+            try:
+                rows = json.loads(value)
+                if not isinstance(rows, list):
+                    rows = []
+            except Exception:
+                rows = []
+        if not rows:
+            rows = [dict(name="case1", setup='[{"op":"create","class":"MyClass","as":"obj"}]', steps='[]')]
+
+        # Normalize rows: ensure setup/steps are strings in the UI
+        norm = []
+        for r in rows:
+            setup_val = r.get("setup", [])
+            steps_val = r.get("steps", [])
+            # If caller passed dict/list, pretty-print; if string, keep as-is
+            if not isinstance(setup_val, str):
+                try:
+                    setup_val = json.dumps(setup_val, indent=2, ensure_ascii=False)
+                except Exception:
+                    setup_val = "[]"
+            if not isinstance(steps_val, str):
+                try:
+                    steps_val = json.dumps(steps_val, indent=2, ensure_ascii=False)
+                except Exception:
+                    steps_val = "[]"
+            norm.append({
+                "name": r.get("name", "case"),
+                "setup": setup_val,
+                "steps": steps_val,
+            })
+
+        input_id = (attrs or {}).get("id", f"id_{name}")
+        data_json = html.escape(json.dumps(norm), quote=True)
+
+        return mark_safe(f"""
+<div class="oop-tests-editor">
+  <input type="hidden" name="{name}" id="{input_id}" value='{data_json}' />
+  <div class="card bg-base-200" style="padding:1rem;">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="text-lg font-semibold">OOP Tests</h3>
+      <div class="join">
+        <button type="button" class="btn btn-sm join-item" data-action="add-row">+ Add</button>
+        <button type="button" class="btn btn-sm btn-error join-item" data-action="clear-all">Clear</button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="table table-zebra w-full">
+        <thead>
+          <tr>
+            <th style="width:12rem;">Name</th>
+            <th>Setup (JSON array)</th>
+            <th>Steps (JSON array)</th>
+            <th style="width:7rem;">Actions</th>
+          </tr>
+        </thead>
+        <tbody data-rows></tbody>
+      </table>
+    </div>
+
+    <div class="mt-2 text-sm opacity-70">
+      Tip: Setup examples: <code>[{{"op":"create","class":"ShoppingCart","as":"cart"}}]</code><br/>
+      Steps examples: <code>[{{"op":"call","on":"cart","method":"add","args":["apple",1.5]}}, {{"op":"call","on":"cart","method":"total","expected":3.5}}]</code>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {{
+  const root = document.currentScript.previousElementSibling;
+  const hidden = root.querySelector("input[type=hidden]");
+  const rowsEl = root.querySelector("[data-rows]");
+
+  function readHidden() {{
+    try {{ return JSON.parse(hidden.value || "[]"); }} catch {{ return []; }}
+  }}
+  function writeHidden() {{
+    const rows = Array.from(rowsEl.querySelectorAll("[data-row]")).map(tr => {{
+      return {{
+        name: tr.querySelector('[data-field="name"]').value.trim() || "case",
+        setup: tr.querySelector('[data-field="setup"]').value,
+        steps: tr.querySelector('[data-field="steps"]').value,
+      }};
+    }});
+    hidden.value = JSON.stringify(rows);
+  }}
+
+  function rowTemplate(t) {{
+    const esc = s => s==null ? "" : String(s);
+    return `
+      <tr data-row>
+        <td>
+          <input class="input input-bordered w-full" data-field="name" value="${{esc(t.name)}}" />
+        </td>
+        <td>
+          <textarea class="textarea textarea-bordered w-full" rows="8" data-field="setup">${{esc(t.setup)}}</textarea>
+        </td>
+        <td>
+          <textarea class="textarea textarea-bordered w-full" rows="8" data-field="steps">${{esc(t.steps)}}</textarea>
+        </td>
+        <td class="text-right">
+          <button type="button" class="btn btn-xs btn-outline" data-action="dup">Duplicate</button>
+          <button type="button" class="btn btn-xs btn-error" data-action="del">Delete</button>
+        </td>
+      </tr>
+    `;
+  }}
+
+  function render() {{
+    const rows = readHidden();
+    rowsEl.innerHTML = rows.map(rowTemplate).join("");
+  }}
+
+  function addRow(prefill) {{
+    const rows = readHidden();
+    rows.push(prefill || {{
+      name: "case" + (rows.length + 1),
+      setup: '[{{"op":"create","class":"MyClass","as":"obj"}}]',
+      steps: "[]"
+    }});
+    hidden.value = JSON.stringify(rows);
+    render();
+  }}
+
+  root.addEventListener("click", (e) => {{
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const action = btn.getAttribute("data-action");
+    const rows = readHidden();
+    if (action === "add-row") {{
+      addRow();
+    }} else if (action === "clear-all") {{
+      hidden.value = "[]"; addRow();
+    }} else {{
+      const tr = btn.closest("[data-row]");
+      const idx = Array.from(rowsEl.children).indexOf(tr);
+      if (action === "del") {{
+        rows.splice(idx, 1);
+        if (rows.length === 0) addRow();
+        else {{ hidden.value = JSON.stringify(rows); render(); }}
+      }} else if (action === "dup") {{
+        const copy = JSON.parse(JSON.stringify(rows[idx] || {{}}));
+        copy.name = (copy.name || "case") + "_copy";
+        rows.splice(idx + 1, 0, copy);
+        hidden.value = JSON.stringify(rows); render();
+      }}
+    }}
+  }});
+
+  root.addEventListener("input", (e) => {{
+    if (e.target.matches("[data-field]")) writeHidden();
+  }});
+
+  render();
+}})();
+</script>
+""")

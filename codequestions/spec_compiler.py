@@ -319,14 +319,16 @@ def _normalize_oop_tests(raw: Dict[str, Any], klass: Dict[str, Any]) -> List[Dic
 
             has_expected = "expected" in a
             has_exception = "exception" in a
-            if has_expected == has_exception:
+            if has_expected and has_exception:
                 raise SpecError("Provide exactly one of 'expected' or 'exception'", apath)
 
             step: Dict[str, Any] = {"op": "call", "on": var, "method": method, "args": pos_args}
             if has_expected:
                 step["expected"] = a["expected"]
-            else:
+            elif has_exception:
                 step["exception"] = _normalize_exception(a["exception"], f"{apath}.exception")
+            # else: no assertion for this step (allowed)
+
 
             _reject_unknown_keys(a, allowed={"action", "var", "method", "args", "expected", "exception"}, path=apath)
             steps.append(step)
