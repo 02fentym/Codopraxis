@@ -5,28 +5,28 @@ from django.shortcuts import get_object_or_404, render
 from codequestions.models import CodeQuestion  # adjust import to your app layout
 
 
+
 def standardio_builder(request):
-    # Try class-level constants first
+    # existing default fetches for timeout/memory...
     timeout_default = getattr(CodeQuestion, "DEFAULT_TIMEOUT_SECONDS", None)
     memory_default  = getattr(CodeQuestion, "DEFAULT_MEMORY_LIMIT_MB", None)
 
-    # Then try model field defaults (if such fields exist)
     if timeout_default is None:
         try:
             timeout_default = CodeQuestion._meta.get_field("timeout_seconds").default
         except Exception:
-            timeout_default = None
+            timeout_default = 5
     if memory_default is None:
         try:
             memory_default = CodeQuestion._meta.get_field("memory_limit_mb").default
         except Exception:
-            memory_default = None
+            memory_default = 128
 
-    # Final fallback (safe, conventional)
-    if timeout_default is None:
-        timeout_default = 5
-    if memory_default is None:
-        memory_default = 128
+    # NEW: starter_code default
+    try:
+        starter_default = CodeQuestion._meta.get_field("starter_code").default or ""
+    except Exception:
+        starter_default = ""
 
     return render(
         request,
@@ -34,8 +34,10 @@ def standardio_builder(request):
         {
             "timeout_default": timeout_default,
             "memory_default": memory_default,
+            "starter_default": starter_default,  # NEW
         },
     )
+
 
 
 @require_POST
@@ -48,17 +50,17 @@ def standardio_validate(request):
     return JsonResponse({"ok": ok, "errors": errors})
 
 
+
 @require_POST
 def standardio_save(request):
     """
-    Body format (wrapper):
+    Expects:
       {
-        "spec": { ...standardIo compiled spec... },
+        "spec": {...},                # standardIo compiled spec ONLY
         "timeout_seconds": 5,
-        "memory_limit_mb": 128
+        "memory_limit_mb": 128,
+        "starter_code": "..."         # NEW: saved on the model, not in JSON
       }
-    We save the spec to CodeQuestion.compiled_spec, and write the limits
-    onto the model fields (NOT into the JSON).
     """
     try:
         payload = json.loads(request.body.decode("utf-8"))
@@ -69,46 +71,37 @@ def standardio_save(request):
     if not isinstance(spec, dict):
         return JsonResponse({"ok": False, "errors": {"spec": "Missing or invalid 'spec' object."}}, status=400)
 
-    # Reuse your existing spec validator
     ok, spec_errors = _validate_standardio(spec)
-
-    # Validate limits here (not part of JSON spec)
     errors = dict(spec_errors) if not ok else {}
+
     timeout_seconds = payload.get("timeout_seconds")
     memory_limit_mb = payload.get("memory_limit_mb")
+    starter_code = payload.get("starter_code", "")
 
-    def _pos_int(val):
-        return isinstance(val, int) and val > 0
-
+    def _pos_int(val): return isinstance(val, int) and val > 0
     if not _pos_int(timeout_seconds):
         errors["timeout_seconds"] = "timeout_seconds must be a positive integer."
     if not _pos_int(memory_limit_mb):
         errors["memory_limit_mb"] = "memory_limit_mb must be a positive integer."
 
+    # starter_code is optional; enforce string type if you want
+    if starter_code is not None and not isinstance(starter_code, str):
+        errors["starter_code"] = "starter_code must be a string."
+
     if errors:
         return JsonResponse({"ok": False, "errors": errors}, status=400)
 
-    # Create or update
     qid = request.GET.get("id")
-    if qid:
-        obj = get_object_or_404(CodeQuestion, pk=qid)
-    else:
-        obj = CodeQuestion()
+    obj = get_object_or_404(CodeQuestion, pk=qid) if qid else CodeQuestion()
 
-    # Write fields
     obj.compiled_spec = spec
-
-    # Only set limits if model has these fields
-    if hasattr(obj, "timeout_seconds"):
-        obj.timeout_seconds = timeout_seconds
-    if hasattr(obj, "memory_limit_mb"):
-        obj.memory_limit_mb = memory_limit_mb
+    if hasattr(obj, "timeout_seconds"): obj.timeout_seconds = timeout_seconds
+    if hasattr(obj, "memory_limit_mb"): obj.memory_limit_mb = memory_limit_mb
+    if hasattr(obj, "starter_code"):    obj.starter_code = starter_code  # NEW
 
     obj.save()
-
     return JsonResponse({"ok": True, "id": obj.pk})
 
-    
 
 # ------- internal validator used by both views --------
 def _validate_standardio(payload):
