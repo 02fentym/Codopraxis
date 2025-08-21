@@ -2,7 +2,7 @@ import json
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, render
-from .models import CodeQuestion  # adjust import to your app layout
+from codequestions.models import CodeQuestion  # adjust import to your app layout
 
 
 def standardio_builder(request):
