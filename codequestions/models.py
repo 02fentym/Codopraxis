@@ -13,10 +13,10 @@ class CodeQuestion(models.Model):
     starter_code = models.TextField(blank=True, default="")
 
     timeout_seconds = models.PositiveIntegerField(
-        default=5, help_text="Max seconds a student submission may run in Docker."
+        default=2, help_text="Max seconds a student submission may run in Docker."
     )
     memory_limit_mb = models.PositiveIntegerField(
-        default=128, help_text="Max RAM (in MB) Docker container may use."
+        default=256, help_text="Max RAM (in MB) Docker container may use."
     )
 
     topic = models.ForeignKey("base.Topic", null=True, blank=True, on_delete=models.SET_NULL)

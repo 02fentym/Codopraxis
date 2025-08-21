@@ -17,7 +17,6 @@
         <div class="card bg-base-200">
             <div class="card-body space-y-6">
                 <h1 class="card-title text-3xl">Standard I/O Builder</h1>
-                <p class="opacity-70">Define the problem without touching YAML. We’ll turn it into a compiled spec.</p>
 
                 <form id="builder-form" method="post" class="space-y-6">
                     {% csrf_token %}
@@ -34,13 +33,40 @@
                             placeholder="Add two numbers together"></textarea>
                     </div>
 
+                    <!-- Limits -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label block">
+                                <span class="label-text font-semibold">Timeout (seconds)</span>
+                            </label>
+                            <input id="timeout_seconds" type="number" min="1" step="1"
+                                class="input input-bordered w-full" value="{{ timeout_default }}">
+                            <p class="text-error text-xs mt-1 hidden" id="err_timeout"></p>
+                            <label class="label">
+                                <span class="label-text-alt opacity-70">Max time per test execution.</span>
+                            </label>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label block">
+                                <span class="label-text font-semibold">Memory limit (MB)</span>
+                            </label>
+                            <input id="memory_limit_mb" type="number" min="16" step="1"
+                                class="input input-bordered w-full" value="{{ memory_default }}">
+                            <p class="text-error text-xs mt-1 hidden" id="err_memory"></p>
+                            <label class="label">
+                                <span class="label-text-alt opacity-70">Max memory per test execution.</span>
+                            </label>
+                        </div>
+                    </div>
+
+
                     <!-- Tests container (JS will render tests here) -->
                     <div id="testsContainer" class="space-y-6"></div>
 
                     <!-- Add Test -->
                     <div class="flex gap-2">
                         <button id="addTestBtn" type="button" class="btn btn-outline">+ Add Test</button>
-                        <button class="btn btn-primary btn-disabled" disabled>Save (coming soon)</button>
                     </div>
                 </form>
             </div>
@@ -64,10 +90,17 @@
                 <div class="mt-2 flex items-center gap-2">
                     <button id="copyJsonBtn" type="button" class="btn btn-outline btn-sm">Copy JSON</button>
                     <button id="validateBtn" type="button" class="btn btn-primary btn-sm">Validate JSON</button>
+                    <button id="saveBtn" type="button" class="btn btn-success btn-sm">Save</button>
                     <span id="newlineBadge" class="badge badge-outline hidden">some stdout will include \n</span>
                 </div>
 
                 <!-- Toasts -->
+                <div id="toastSaveOk" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-success"><span>Saved.</span></div>
+                </div>
+                <div id="toastSaveErr" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-error"><span>Save failed. Fix errors and try again.</span></div>
+                </div>
                 <div id="toastOk" class="toast toast-end z-50 hidden">
                     <div class="alert alert-success"><span>Spec is valid.</span></div>
                 </div>
@@ -92,90 +125,106 @@
     </div>
 </div>
 
+
+
 <script>
-(function () {
-  const $ = (id) => document.getElementById(id);
+    (function () {
+        const $ = (id) => document.getElementById(id);
 
-  // ----- DOM refs -----
-  const descriptionEl = $("description");
-  const testsContainer = $("testsContainer");
-  const previewEl = $("specPreview");
-  const newlineBadge = $("newlineBadge");
-  const addTestBtn = $("addTestBtn");
+        // ----- DOM refs -----
+        const descriptionEl = $("description");
+        const timeoutEl = $("timeout_seconds");
+        const memoryEl = $("memory_limit_mb");
+        const errTimeout = $("err_timeout");
+        const errMemory = $("err_memory");
 
-  const copyBtn  = document.getElementById("copyJsonBtn");
-  const toastEl  = document.getElementById("toast");     // optional (for copy)
-  const validateBtn = document.getElementById("validateBtn");
-  const toastOk  = document.getElementById("toastOk");   // success (validate)
-  const toastErr = document.getElementById("toastErr");  // error (validate)
+        const testsContainer = $("testsContainer");
+        const previewEl = $("specPreview");
+        const newlineBadge = $("newlineBadge");
+        const addTestBtn = $("addTestBtn");
 
-  // ----- State -----
-  let tests = [
-    { name: "test1", stdin: "", stdout: "" }
-  ];
+        const copyBtn = document.getElementById("copyJsonBtn");
+        const toastEl = document.getElementById("toast");     // optional (copy)
+        const validateBtn = document.getElementById("validateBtn");
+        const toastOk = document.getElementById("toastOk");
+        const toastErr = document.getElementById("toastErr");
+        const saveBtn = document.getElementById("saveBtn");
+        const toastSaveOk = document.getElementById("toastSaveOk");
+        const toastSaveErr = document.getElementById("toastSaveErr");
 
-  // ----- Utilities -----
-  function show(el, ms = 1800) {
-    if (!el) return;
-    el.classList.remove("hidden");
-    setTimeout(() => el.classList.add("hidden"), ms);
-  }
+        // ----- State -----
+        let tests = [
+            { name: "test1", stdin: "", stdout: "" }
+        ];
+        let currentQuestionId = null; // set after first successful save
 
-  function getCookie(name) {
-    const v = document.cookie.split("; ").find(row => row.startsWith(name + "="));
-    return v ? decodeURIComponent(v.split("=")[1]) : null;
-  }
-  const csrftoken = getCookie("csrftoken");
+        // ----- Utilities -----
+        function show(el, ms = 1800) {
+            if (!el) return;
+            el.classList.remove("hidden");
+            setTimeout(() => el.classList.add("hidden"), ms);
+        }
 
-  function sectionNodes() {
-    return [...testsContainer.querySelectorAll("[data-test-index]")];
-  }
+        function getCookie(name) {
+            const v = document.cookie.split("; ").find(row => row.startsWith(name + "="));
+            return v ? decodeURIComponent(v.split("=")[1]) : null;
+        }
+        const csrftoken = getCookie("csrftoken");
 
-  function clearInlineErrors(section) {
-    const nameEl   = section.querySelector('[data-role="name"]');
-    const stdinEl  = section.querySelector('[data-role="stdin"]');
-    const stdoutEl = section.querySelector('[data-role="stdout"]');
-    const errName  = section.querySelector('[data-err="name"]');
-    const errStdin = section.querySelector('[data-err="stdin"]');
-    const errStdout= section.querySelector('[data-err="stdout"]');
+        function sectionNodes() {
+            return [...testsContainer.querySelectorAll("[data-test-index]")];
+        }
 
-    [nameEl, stdinEl, stdoutEl].forEach(el => el && el.classList.remove("input-error","textarea-error"));
-    [errName, errStdin, errStdout].forEach(el => { if (el){ el.textContent = ""; el.classList.add("hidden"); }});
-  }
+        function clearInlineErrors(section) {
+            const nameEl = section.querySelector('[data-role="name"]');
+            const stdinEl = section.querySelector('[data-role="stdin"]');
+            const stdoutEl = section.querySelector('[data-role="stdout"]');
+            const errName = section.querySelector('[data-err="name"]');
+            const errStdin = section.querySelector('[data-err="stdin"]');
+            const errStdout = section.querySelector('[data-err="stdout"]');
 
-  function showFieldError(section, field, message) {
-    const map = {
-      name:   { inputSel: '[data-role="name"]',   errSel: '[data-err="name"]',   errorClass: 'input-error'   },
-      stdin:  { inputSel: '[data-role="stdin"]',  errSel: '[data-err="stdin"]',  errorClass: 'textarea-error'},
-      stdout: { inputSel: '[data-role="stdout"]', errSel: '[data-err="stdout"]', errorClass: 'input-error'   },
-    };
-    const cfg = map[field];
-    if (!cfg) return;
-    const input = section.querySelector(cfg.inputSel);
-    const err   = section.querySelector(cfg.errSel);
-    if (input) input.classList.add(cfg.errorClass);
-    if (err) { err.textContent = message; err.classList.remove("hidden"); }
-  }
+            [nameEl, stdinEl, stdoutEl].forEach(el => el && el.classList.remove("input-error", "textarea-error"));
+            [errName, errStdin, errStdout].forEach(el => { if (el) { el.textContent = ""; el.classList.add("hidden"); } });
+        }
 
-  // Unique name helper for duplication
-  function makeUniqueName(base) {
-    const existing = new Set(tests.map(t => (t.name || "").trim()).filter(Boolean));
-    let candidate = base.trim() || "test";
-    if (!existing.has(candidate)) return candidate;
-    // try "-copy", "-copy-2", "-copy-3", ...
-    let i = 1;
-    while (existing.has(`${candidate}-copy${i > 1 ? "-" + i : ""}`)) i++;
-    return `${candidate}-copy${i > 1 ? "-" + i : ""}`;
-  }
+        function clearGlobalErrors() {
+            [timeoutEl, memoryEl].forEach(el => el && el.classList.remove("input-error"));
+            if (errTimeout) { errTimeout.textContent = ""; errTimeout.classList.add("hidden"); }
+            if (errMemory) { errMemory.textContent = ""; errMemory.classList.add("hidden"); }
+        }
 
-  // ----- Renderers -----
-  function testSectionTemplate(idx, test) {
-    const n = idx + 1;
-    const stdinId  = `stdin_${n}`;
-    const stdoutId = `stdout_${n}`;
-    const nameId   = `name_${n}`;
+        function showFieldError(section, field, message) {
+            const map = {
+                name: { inputSel: '[data-role="name"]', errSel: '[data-err="name"]', errorClass: 'input-error' },
+                stdin: { inputSel: '[data-role="stdin"]', errSel: '[data-err="stdin"]', errorClass: 'textarea-error' },
+                stdout: { inputSel: '[data-role="stdout"]', errSel: '[data-err="stdout"]', errorClass: 'input-error' },
+            };
+            const cfg = map[field];
+            if (!cfg) return;
+            const input = section.querySelector(cfg.inputSel);
+            const err = section.querySelector(cfg.errSel);
+            if (input) input.classList.add(cfg.errorClass);
+            if (err) { err.textContent = message; err.classList.remove("hidden"); }
+        }
 
-    return `
+        // Unique name helper for duplication
+        function makeUniqueName(base) {
+            const existing = new Set(tests.map(t => (t.name || "").trim()).filter(Boolean));
+            let candidate = (base || "test").trim();
+            if (!existing.has(candidate)) return candidate;
+            let i = 1;
+            while (existing.has(`${candidate}-copy${i > 1 ? "-" + i : ""}`)) i++;
+            return `${candidate}-copy${i > 1 ? "-" + i : ""}`;
+        }
+
+        // ----- Renderers -----
+        function testSectionTemplate(idx, test) {
+            const n = idx + 1;
+            const stdinId = `stdin_${n}`;
+            const stdoutId = `stdout_${n}`;
+            const nameId = `name_${n}`;
+
+            return `
       <div class="space-y-3 border border-base-100 rounded-box p-4" data-test-index="${idx}">
         <div class="flex items-center justify-between">
           <div class="divider my-0 w-auto">Test #${n}</div>
@@ -227,246 +276,333 @@
         </div>
       </div>
     `;
-  }
-
-  function renderTests() {
-    testsContainer.innerHTML = tests.map((t, i) => testSectionTemplate(i, t)).join("");
-  }
-
-  // ----- State coercion & spec -----
-  function coerceStateFromDOM() {
-    const sections = sectionNodes();
-    tests = sections.map((section, i) => {
-      const nameEl   = section.querySelector('[data-role="name"]');
-      const stdinEl  = section.querySelector('[data-role="stdin"]');
-      const stdoutEl = section.querySelector('[data-role="stdout"]');
-
-      const rawStdout = (stdoutEl.value || "");
-      const stdout = rawStdout ? (rawStdout.endsWith("\n") ? rawStdout : rawStdout + "\n") : "";
-      return {
-        name: (nameEl.value || `test${i+1}`).trim(),
-        stdin: stdinEl.value || "",
-        stdout: stdout
-      };
-    });
-  }
-
-  function hasContent(t) {
-    return (t.stdin && t.stdin.length) || (t.stdout && t.stdout.length);
-  }
-
-  function buildSpec() {
-    coerceStateFromDOM();
-    // Only include tests with any content
-    const filtered = tests.filter(hasContent);
-    return {
-      version: 1,
-      type: "standardIo",
-      description: descriptionEl.value || "",
-      tests: filtered
-    };
-  }
-
-  // ----- Client-side validation -----
-  function validateClient() {
-    const sections = sectionNodes();
-    let anyNeedsNewline = false;
-    let isValid = true;
-
-    // Count names for uniqueness
-    const nameCounts = {};
-    sections.forEach((section) => {
-      const nameEl = section.querySelector('[data-role="name"]');
-      const name = (nameEl.value || "").trim();
-      if (name) nameCounts[name] = (nameCounts[name] || 0) + 1;
-    });
-
-    sections.forEach((section) => {
-      clearInlineErrors(section);
-
-      const nameEl   = section.querySelector('[data-role="name"]');
-      const stdinEl  = section.querySelector('[data-role="stdin"]');
-      const stdoutEl = section.querySelector('[data-role="stdout"]');
-
-      const name = (nameEl.value || "").trim();
-      const rawStdout = (stdoutEl.value || "");
-      const contentPresent = (stdinEl.value && stdinEl.value.length) || rawStdout.length;
-
-      // Name required & unique
-      if (!name) {
-        isValid = false;
-        showFieldError(section, "name", "Test name is required.");
-      } else if (nameCounts[name] > 1) {
-        isValid = false;
-        showFieldError(section, "name", "Test name must be unique.");
-      }
-
-      // stdout required if there is any content
-      if (contentPresent && rawStdout.trim().length === 0) {
-        isValid = false;
-        showFieldError(section, "stdout", "stdout is required when a test has input/output.");
-      }
-
-      if (rawStdout && !rawStdout.endsWith("\n")) {
-        anyNeedsNewline = true;
-      }
-    });
-
-    newlineBadge.classList.toggle("hidden", !anyNeedsNewline);
-    return isValid;
-  }
-
-  // ----- Server-side errors -> inline surfacing -----
-  function applyServerErrors(errors) {
-    // Clear prior server errors
-    sectionNodes().forEach(clearInlineErrors);
-
-    Object.keys(errors || {}).forEach(key => {
-      const match = key.match(/^tests\[(\d+)\]$/);
-      if (!match) return;
-      const idx = parseInt(match[1], 10);
-      const section = sectionNodes()[idx];
-      if (!section) return;
-
-      const tErr = errors[key];
-      if (tErr && typeof tErr === "object") {
-        if (tErr.name)   showFieldError(section, "name",   tErr.name);
-        if (tErr.stdin)  showFieldError(section, "stdin",  tErr.stdin);
-        if (tErr.stdout) showFieldError(section, "stdout", tErr.stdout);
-      }
-    });
-
-    const firstErr = testsContainer.querySelector(".text-error:not(.hidden)");
-    if (firstErr) firstErr.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-
-  // ----- Preview render -----
-  function renderPreview() {
-    validateClient(); // inline client errors
-    previewEl.textContent = JSON.stringify(buildSpec(), null, 2);
-  }
-
-  // ----- Events -----
-  testsContainer.addEventListener("input", renderPreview);
-  testsContainer.addEventListener("change", renderPreview);
-
-  testsContainer.addEventListener("click", function (e) {
-    const section = e.target.closest("[data-test-index]");
-    if (!section) return;
-    const idx = parseInt(section.dataset.testIndex, 10);
-
-    // Remove
-    const removeBtn = e.target.closest("[data-action='removeTest']");
-    if (removeBtn) {
-      if (tests.length <= 1) return;
-      tests.splice(idx, 1);
-      // Re-number default names only if they match "testN"
-      tests = tests.map((t, i) => ({
-        ...t,
-        name: t.name && /^test\d+$/.test(t.name) ? `test${i+1}` : t.name
-      }));
-      renderTests();
-      renderPreview();
-      return;
-    }
-
-    // Duplicate
-    const dupBtn = e.target.closest("[data-action='duplicateTest']");
-    if (dupBtn) {
-      // Read raw values from DOM so we don't double-append newline
-      const nameEl   = section.querySelector('[data-role="name"]');
-      const stdinEl  = section.querySelector('[data-role="stdin"]');
-      const stdoutEl = section.querySelector('[data-role="stdout"]');
-
-      const baseName = (nameEl.value || `test${idx+1}`).trim();
-      const newName  = makeUniqueName(baseName || `test${idx+1}`);
-
-      // Create a new test object; keep stdout as entered (no newline),
-      // our coerce/buildSpec handles normalizing to include \n.
-      const newTest = {
-        name: newName,
-        stdin: stdinEl.value || "",
-        stdout: (stdoutEl.value || "")
-      };
-
-      tests.splice(idx + 1, 0, newTest);
-      renderTests();
-      renderPreview();
-
-      // Focus the duplicated test name for quick edits
-      const newSection = sectionNodes()[idx + 1];
-      const newNameInput = newSection?.querySelector('[data-role="name"]');
-      if (newNameInput) newNameInput.focus();
-    }
-  });
-
-  addTestBtn.addEventListener("click", function () {
-    const next = tests.length + 1;
-    tests.push({ name: `test${next}`, stdin: "", stdout: "" });
-    renderTests();
-    renderPreview();
-  });
-
-  ["input", "change"].forEach(evt => descriptionEl.addEventListener(evt, renderPreview));
-
-  // Copy JSON
-  if (copyBtn) {
-    copyBtn.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(previewEl.textContent);
-        show(toastEl); // success toast for copy (if present)
-      } catch (e) {
-        const tmp = document.createElement("textarea");
-        tmp.value = previewEl.textContent;
-        document.body.appendChild(tmp);
-        tmp.select();
-        document.execCommand("copy");
-        document.body.removeChild(tmp);
-        show(toastEl);
-      }
-    });
-  }
-
-  // Validate JSON (server)
-  if (validateBtn) {
-    validateBtn.addEventListener("click", async () => {
-      // Ensure preview/spec is current & clear prior errors
-      renderPreview();
-      sectionNodes().forEach(clearInlineErrors);
-
-      const specText = previewEl.textContent;
-      try {
-        const res = await fetch("{% url 'standardio-validate' %}", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrftoken
-          },
-          body: specText
-        });
-        if (!res.ok) throw new Error("Network error");
-        const data = await res.json();
-
-        if (data.ok) {
-          show(toastOk);
-        } else {
-          applyServerErrors(data.errors || {});
-          show(toastErr);
         }
-      } catch (e) {
-        console.error(e);
-        show(toastErr);
-      }
-    });
-  }
 
-  // ----- Initial render -----
-  renderTests();
-  renderPreview();
-})();
+        function renderTests() {
+            testsContainer.innerHTML = tests.map((t, i) => testSectionTemplate(i, t)).join("");
+        }
+
+        // ----- State coercion & spec -----
+        function coerceStateFromDOM() {
+            const sections = sectionNodes();
+            tests = sections.map((section, i) => {
+                const nameEl = section.querySelector('[data-role="name"]');
+                const stdinEl = section.querySelector('[data-role="stdin"]');
+                const stdoutEl = section.querySelector('[data-role="stdout"]');
+
+                const rawStdout = (stdoutEl.value || "");
+                const stdout = rawStdout ? (rawStdout.endsWith("\n") ? rawStdout : rawStdout + "\n") : "";
+                return {
+                    name: (nameEl.value || `test${i + 1}`).trim(),
+                    stdin: stdinEl.value || "",
+                    stdout: stdout
+                };
+            });
+        }
+
+        function hasContent(t) {
+            return (t.stdin && t.stdin.length) || (t.stdout && t.stdout.length);
+        }
+
+        function parsePositiveInt(el) {
+            const v = (el?.value ?? "").trim();
+            const n = Number(v);
+            return Number.isInteger(n) && n > 0 ? n : null;
+        }
+
+        function buildSpec() {
+            coerceStateFromDOM();
+            const filtered = tests.filter(hasContent);
+
+            // IMPORTANT: do NOT include limits in the spec object
+            return {
+                version: 1,
+                type: "standardIo",
+                description: descriptionEl.value || "",
+                tests: filtered
+            };
+        }
+
+        // ----- Client-side validation -----
+        function validateClient() {
+            const sections = sectionNodes();
+            let anyNeedsNewline = false;
+            let isValid = true;
+
+            // Global numeric validations (even though not in JSON, we still validate UX)
+            clearGlobalErrors();
+            const tVal = parsePositiveInt(timeoutEl);
+            const mVal = parsePositiveInt(memoryEl);
+            if (tVal === null) {
+                isValid = false;
+                timeoutEl.classList.add("input-error");
+                errTimeout.textContent = "Enter a positive integer.";
+                errTimeout.classList.remove("hidden");
+            }
+            if (mVal === null) {
+                isValid = false;
+                memoryEl.classList.add("input-error");
+                errMemory.textContent = "Enter a positive integer.";
+                errMemory.classList.remove("hidden");
+            }
+
+            // Count names for uniqueness
+            const nameCounts = {};
+            sections.forEach((section) => {
+                const nameEl = section.querySelector('[data-role="name"]');
+                const name = (nameEl.value || "").trim();
+                if (name) nameCounts[name] = (nameCounts[name] || 0) + 1;
+            });
+
+            sections.forEach((section) => {
+                clearInlineErrors(section);
+
+                const nameEl = section.querySelector('[data-role="name"]');
+                const stdinEl = section.querySelector('[data-role="stdin"]');
+                const stdoutEl = section.querySelector('[data-role="stdout"]');
+
+                const name = (nameEl.value || "").trim();
+                const rawStdout = (stdoutEl.value || "");
+                const contentPresent = (stdinEl.value && stdinEl.value.length) || rawStdout.length;
+
+                // Name required & unique
+                if (!name) {
+                    isValid = false;
+                    showFieldError(section, "name", "Test name is required.");
+                } else if (nameCounts[name] > 1) {
+                    isValid = false;
+                    showFieldError(section, "name", "Test name must be unique.");
+                }
+
+                // stdout required if there is any content
+                if (contentPresent && rawStdout.trim().length === 0) {
+                    isValid = false;
+                    showFieldError(section, "stdout", "stdout is required when a test has input/output.");
+                }
+
+                if (rawStdout && !rawStdout.endsWith("\n")) {
+                    anyNeedsNewline = true;
+                }
+            });
+
+            newlineBadge.classList.toggle("hidden", !anyNeedsNewline);
+            return isValid;
+        }
+
+        // ----- Server-side errors -> inline surfacing -----
+        function applyServerErrors(errors) {
+            // Clear prior
+            sectionNodes().forEach(clearInlineErrors);
+            clearGlobalErrors();
+
+            if (errors.timeout_seconds) {
+                timeoutEl.classList.add("input-error");
+                errTimeout.textContent = errors.timeout_seconds;
+                errTimeout.classList.remove("hidden");
+            }
+            if (errors.memory_limit_mb) {
+                memoryEl.classList.add("input-error");
+                errMemory.textContent = errors.memory_limit_mb;
+                errMemory.classList.remove("hidden");
+            }
+
+            Object.keys(errors || {}).forEach(key => {
+                const match = key.match(/^tests\[(\d+)\]$/);
+                if (!match) return;
+                const idx = parseInt(match[1], 10);
+                const section = sectionNodes()[idx];
+                if (!section) return;
+
+                const tErr = errors[key];
+                if (tErr && typeof tErr === "object") {
+                    if (tErr.name) showFieldError(section, "name", tErr.name);
+                    if (tErr.stdin) showFieldError(section, "stdin", tErr.stdin);
+                    if (tErr.stdout) showFieldError(section, "stdout", tErr.stdout);
+                }
+            });
+
+            const firstErr = document.querySelector(".text-error:not(.hidden)");
+            if (firstErr) firstErr.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
+        // ----- Preview render -----
+        function renderPreview() {
+            validateClient(); // inline client errors
+            previewEl.textContent = JSON.stringify(buildSpec(), null, 2);
+        }
+
+        // ----- Events -----
+        testsContainer.addEventListener("input", renderPreview);
+        testsContainer.addEventListener("change", renderPreview);
+        ["input", "change"].forEach(evt => {
+            descriptionEl.addEventListener(evt, renderPreview);
+            timeoutEl.addEventListener(evt, renderPreview);
+            memoryEl.addEventListener(evt, renderPreview);
+        });
+
+        testsContainer.addEventListener("click", function (e) {
+            const section = e.target.closest("[data-test-index]");
+            if (!section) return;
+            const idx = parseInt(section.dataset.testIndex, 10);
+
+            // Remove
+            const removeBtn = e.target.closest("[data-action='removeTest']");
+            if (removeBtn) {
+                if (tests.length <= 1) return;
+                tests.splice(idx, 1);
+                tests = tests.map((t, i) => ({
+                    ...t,
+                    name: t.name && /^test\d+$/.test(t.name) ? `test${i + 1}` : t.name
+                }));
+                renderTests();
+                renderPreview();
+                return;
+            }
+
+            // Duplicate
+            const dupBtn = e.target.closest("[data-action='duplicateTest']");
+            if (dupBtn) {
+                const nameEl = section.querySelector('[data-role="name"]');
+                const stdinEl = section.querySelector('[data-role="stdin"]');
+                const stdoutEl = section.querySelector('[data-role="stdout"]');
+
+                const baseName = (nameEl.value || `test${idx + 1}`).trim();
+                const newName = makeUniqueName(baseName || `test${idx + 1}`);
+
+                const newTest = {
+                    name: newName,
+                    stdin: stdinEl.value || "",
+                    stdout: (stdoutEl.value || "")
+                };
+
+                tests.splice(idx + 1, 0, newTest);
+                renderTests();
+                renderPreview();
+
+                const newSection = sectionNodes()[idx + 1];
+                const newNameInput = newSection?.querySelector('[data-role="name"]');
+                if (newNameInput) newNameInput.focus();
+            }
+        });
+
+        addTestBtn.addEventListener("click", function () {
+            const next = tests.length + 1;
+            tests.push({ name: `test${next}`, stdin: "", stdout: "" });
+            renderTests();
+            renderPreview();
+        });
+
+        // Copy JSON
+        if (copyBtn) {
+            copyBtn.addEventListener("click", async () => {
+                try {
+                    await navigator.clipboard.writeText(previewEl.textContent);
+                    show(toastEl);
+                } catch (e) {
+                    const tmp = document.createElement("textarea");
+                    tmp.value = previewEl.textContent;
+                    document.body.appendChild(tmp);
+                    tmp.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(tmp);
+                    show(toastEl);
+                }
+            });
+        }
+
+        // Validate JSON (server) — sends SPEC ONLY
+        if (validateBtn) {
+            validateBtn.addEventListener("click", async () => {
+                renderPreview();
+                sectionNodes().forEach(clearInlineErrors);
+                clearGlobalErrors();
+
+                const specText = previewEl.textContent;
+                try {
+                    const res = await fetch("{% url 'standardio-validate' %}", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": csrftoken
+                        },
+                        body: specText
+                    });
+                    if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        if (data && data.errors) applyServerErrors(data.errors);
+                        show(toastErr);
+                        return;
+                    }
+                    const data = await res.json();
+                    if (data.ok) {
+                        show(toastOk);
+                    } else {
+                        applyServerErrors(data.errors || {});
+                        show(toastErr);
+                    }
+                } catch (e) {
+                    console.error(e);
+                    show(toastErr);
+                }
+            });
+        }
+
+        // Save — sends WRAPPER { spec, timeout_seconds, memory_limit_mb }
+        if (saveBtn) {
+            saveBtn.addEventListener("click", async () => {
+                renderPreview();
+                sectionNodes().forEach(clearInlineErrors);
+                clearGlobalErrors();
+
+                const specObj = JSON.parse(previewEl.textContent);
+                const tVal = parsePositiveInt(timeoutEl);
+                const mVal = parsePositiveInt(memoryEl);
+                const payload = {
+                    spec: specObj,
+                    timeout_seconds: tVal,
+                    memory_limit_mb: mVal
+                };
+
+                try {
+                    const url = new URL("{% url 'standardio-save' %}", window.location.origin);
+                    if (currentQuestionId) url.searchParams.set("id", currentQuestionId);
+
+                    const res = await fetch(url.toString(), {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": csrftoken
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        if (data && data.errors) applyServerErrors(data.errors);
+                        show(toastSaveErr);
+                        return;
+                    }
+
+                    const data = await res.json();
+                    if (data.ok) {
+                        currentQuestionId = data.id;
+                        show(toastSaveOk);
+                    } else {
+                        if (data.errors) applyServerErrors(data.errors);
+                        show(toastSaveErr);
+                    }
+                } catch (e) {
+                    console.error(e);
+                    show(toastSaveErr);
+                }
+            });
+        }
+
+        // ----- Initial render -----
+        renderTests();
+        renderPreview();
+    })();
 </script>
-
-
 
 
 {% endblock %}
