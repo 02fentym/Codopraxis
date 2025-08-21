@@ -11,4 +11,9 @@ urlpatterns = [
     path("function/builder/", views.function_builder, name="function-builder"),
     path("function/validate/", views.function_validate, name="function-validate"),
     path("function/save/", views.function_save, name="function-save"),
+
+    # OOP
+    path("oop/builder/", views.oop_builder, name="oop-builder"),
+    path("oop/validate/", views.oop_validate, name="oop-validate"),
+    path("oop/save/", views.oop_save, name="oop-save"),
 ]

@@ -1,0 +1,738 @@
+{% extends "main.html" %}
+{% block title %}OOP Builder{% endblock %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-6">
+  <!-- Breadcrumbs -->
+  <div class="breadcrumbs text-sm">
+    <ul>
+      <li><a href="{% url 'home' %}" class="link">Home</a></li>
+      <li><span class="opacity-70">Code Questions</span></li>
+      <li class="font-semibold">OOP Builder</li>
+    </ul>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Left -->
+    <div class="card bg-base-200">
+      <div class="card-body space-y-6">
+        <h1 class="card-title text-3xl">OOP Builder</h1>
+
+        <form id="builder-form" method="post" class="space-y-6">
+          {% csrf_token %}
+
+          <!-- Description -->
+          <div class="form-control">
+            <label class="label block">
+              <span class="label-text font-medium">
+                Description <span class="opacity-60 text-xs">(shown to students)</span>
+              </span>
+            </label>
+            <textarea id="description" class="textarea textarea-bordered bg-base-100 w-full h-24"
+                      placeholder="Implement a Counter class with increment() and get() methods."></textarea>
+          </div>
+
+          <div class="divider my-0 w-auto text-lg font-bold mb-6">Class</div>
+
+          <!-- Class & Methods -->
+          <div class="space-y-4 border border-base-100 rounded-box p-4">
+            <div class="form-control">
+              <label class="label block"><span class="label-text font-medium">Class name</span></label>
+              <input id="class_name" type="text" class="input input-bordered w-full" placeholder="Counter" />
+              <p class="text-error text-xs mt-1 hidden" id="err_class_name"></p>
+            </div>
+
+            <div class="space-y-2">
+              <div class="text-base font-semibold">Methods</div>
+              <div id="methodsContainer" class="space-y-3"></div>
+              <div class="flex justify-center mt-2">
+                <button id="addMethodBtn" type="button" class="btn btn-circle btn-outline btn-sm">+</button>
+              </div>
+              <p class="text-error text-xs mt-1 hidden" id="err_methods"></p>
+            </div>
+          </div>
+
+          <!-- Limits -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="form-control">
+              <label class="label block"><span class="label-text font-medium">Timeout (seconds)</span></label>
+              <input id="timeout_seconds" type="number" min="1" step="1"
+                     class="input input-bordered w-full" value="{{ timeout_default|default:5 }}">
+              <p class="text-error text-xs mt-1 hidden" id="err_timeout"></p>
+              <label class="label"><span class="opacity-60 text-xs">Max time per test execution.</span></label>
+            </div>
+
+            <div class="form-control">
+              <label class="label block"><span class="label-text font-medium">Memory limit (MB)</span></label>
+              <input id="memory_limit_mb" type="number" min="16" step="1"
+                     class="input input-bordered w-full" value="{{ memory_default|default:256 }}">
+              <p class="text-error text-xs mt-1 hidden" id="err_memory"></p>
+              <label class="label"><span class="opacity-60 text-xs">Max memory per test execution.</span></label>
+            </div>
+          </div>
+
+          <!-- Starter Code (NOT part of JSON spec) -->
+          <div class="form-control">
+            <label class="label block"><span class="label-text font-medium">Starter code (optional)</span></label>
+            <textarea id="starter_code" class="textarea textarea-bordered bg-base-100 w-full h-28"
+              placeholder="class Counter:&#10;    def __init__(self):&#10;        self.value = 0&#10;    def increment(self):&#10;        self.value += 1&#10;    def get(self):&#10;        return self.value">{{ starter_default|default:'' }}</textarea>
+            <label class="label">
+              <span class="opacity-60 text-xs">Prefilled in the student's editor. This is <strong>not</strong> stored in the JSON spec.</span>
+            </label>
+          </div>
+
+          <div class="divider my-0 w-auto text-lg font-bold mb-6">Tests</div>
+          <!-- Tests -->
+          <div class="space-y-3">
+            <div id="testsContainer" class="space-y-6"></div>
+            <div class="flex justify-center mt-2">
+              <button id="addTestBtn" type="button" class="btn btn-circle btn-outline btn-sm">+</button>
+            </div>
+            <p class="text-error text-xs mt-1 hidden" id="err_tests"></p>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Right: Preview + Actions -->
+    <div class="card bg-base-200 lg:sticky lg:top-6 h-fit">
+      <div class="card-body">
+        <h2 class="card-title text-2xl mb-2">Compiled Spec (Preview)</h2>
+        <div class="mockup-code text-xs bg-base-100">
+<pre><code id="specPreview">{
+  "version": 1,
+  "type": "oop",
+  "description": "",
+  "class": { "name": "", "methods": [] },
+  "tests": []
+}</code></pre>
+        </div>
+
+        <div class="mt-2 flex items-center gap-2">
+          <button id="copyJsonBtn" type="button" class="btn btn-outline btn-sm">Copy JSON</button>
+          <button id="validateBtn" type="button" class="btn btn-primary btn-sm">Validate JSON</button>
+          <button id="saveBtn" type="button" class="btn btn-success btn-sm">Save</button>
+        </div>
+
+        <!-- Toasts -->
+        <div id="toastCopy" class="toast toast-end z-50 hidden"><div class="alert alert-success"><span>Copied to clipboard.</span></div></div>
+        <div id="toastOk" class="toast toast-end z-50 hidden"><div class="alert alert-success"><span>Spec is valid.</span></div></div>
+        <div id="toastErr" class="toast toast-end z-50 hidden"><div class="alert alert-error"><span>Spec has issues. See highlights.</span></div></div>
+        <div id="toastSaveOk" class="toast toast-end z-50 hidden"><div class="alert alert-success"><span>Saved.</span></div></div>
+        <div id="toastSaveErr" class="toast toast-end z-50 hidden"><div class="alert alert-error"><span>Save failed. Fix errors and try again.</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  // DOM refs
+  const descriptionEl = $("description");
+  const classNameEl = $("class_name");
+  const methodsContainer = $("methodsContainer");
+  const addMethodBtn = $("addMethodBtn");
+
+  const timeoutEl = $("timeout_seconds");
+  const memoryEl  = $("memory_limit_mb");
+  const starterEl = $("starter_code");
+
+  const testsContainer = $("testsContainer");
+  const addTestBtn = $("addTestBtn");
+
+  const specPreview = $("specPreview");
+  const copyBtn = $("copyJsonBtn");
+  const validateBtn = $("validateBtn");
+  const saveBtn = $("saveBtn");
+
+  const errClassName = $("err_class_name");
+  const errMethods = $("err_methods");
+  const errTests = $("err_tests");
+  const errTimeout = $("err_timeout");
+  const errMemory = $("err_memory");
+
+  const toastCopy = $("toastCopy");
+  const toastOk = $("toastOk");
+  const toastErr = $("toastErr");
+  const toastSaveOk = $("toastSaveOk");
+  const toastSaveErr = $("toastSaveErr");
+
+  function show(el, ms=1800){ if(!el) return; el.classList.remove("hidden"); setTimeout(()=>el.classList.add("hidden"), ms); }
+  function getCookie(name){ const v=document.cookie.split("; ").find(r=>r.startsWith(name+"=")); return v?decodeURIComponent(v.split("=")[1]):null; }
+  const csrftoken = getCookie("csrftoken");
+
+  // State
+  const TYPE_OPTIONS = ["integer","float","string","bool"];
+  const RETURN_OPTIONS = ["void","integer","float","string","bool"];
+
+  let methods = [
+    // { name:"__init__", returns:"void", args:[{name:"",type:"integer"}] }
+  ];
+
+  let tests = [
+    // {
+    //   name:"simpleIncrement",
+    //   setup:[ {action:"create", class:"Counter", var:"c", args:[]} ],
+    //   actions:[ {action:"call", var:"c", method:"increment", args:[]}, {action:"call", var:"c", method:"get", args:[], expected:1} ]
+    // }
+  ];
+
+  let currentQuestionId = null;
+
+  // Templates — Methods
+  function methodArgRowTemplate(mIdx, aIdx, arg){
+    const name = arg?.name ?? `arg${aIdx+1}`;
+    const type = arg?.type ?? "integer";
+    const options = TYPE_OPTIONS.map(t=>`<option value="${t}" ${t===type?'selected':''}>${t}</option>`).join("");
+    return `
+      <div class="flex items-end gap-3" data-midx="${mIdx}" data-arg-index="${aIdx}">
+        <div class="form-control flex-1">
+          <label class="label"><span class="label-text font-medium">Arg Name</span></label>
+          <input type="text" class="input input-bordered w-full" data-role="arg-name" placeholder="arg${aIdx+1}" value="${name}">
+        </div>
+        <div class="form-control w-40">
+          <label class="label"><span class="label-text font-medium">Arg Type</span></label>
+          <select class="select select-bordered w-full" data-role="arg-type">${options}</select>
+        </div>
+        <button type="button" class="btn btn-ghost text-error mb-1" data-action="remove-arg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
+            <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+          </svg>
+        </button>
+      </div>
+    `;
+  }
+
+  function methodCardTemplate(idx, m){
+    const n = idx + 1;
+    const returns = m?.returns ?? "void";
+    const retOptions = RETURN_OPTIONS.map(r=>`<option value="${r}" ${r===returns?'selected':''}>${r}</option>`).join("");
+    const argsHTML = (m.args || []).map((a,ai)=>methodArgRowTemplate(idx, ai, a)).join("");
+    return `
+      <div class="space-y-3 border border-base-100 rounded-box p-4" data-method-index="${idx}">
+        <div class="flex items-center justify-between">
+          <div class="font-medium">Method #${n}</div>
+          <div class="flex items-center gap-1">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicate-method" title="Duplicate">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M11.25 4.25v-2.5h-9.5v9.5h2.5m.5-6.5v9.5h9.5v-9.5z"/>
+              </svg>
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm text-error" data-action="remove-method" ${methods.length<=1?'disabled':''} title="Remove">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
+                <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-3">
+          <div class="col-span-7 form-control">
+            <label class="label"><span class="label-text font-medium">Method name</span></label>
+            <input type="text" class="input input-bordered w-full" data-role="method-name" placeholder="increment" value="${m?.name ?? ""}">
+          </div>
+          <div class="col-span-5 form-control">
+            <label class="label"><span class="label-text font-medium">Returns</span></label>
+            <select class="select select-bordered w-full" data-role="method-returns">${retOptions}</select>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <div class="text-sm font-semibold">Arguments</div>
+          <div data-role="method-args" class="space-y-3">
+            ${argsHTML}
+          </div>
+          <div class="flex justify-center mt-2">
+            <button type="button" class="btn btn-circle btn-outline btn-sm" data-action="add-arg">+</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderMethods(){
+    methodsContainer.innerHTML = methods.map((m,i)=>methodCardTemplate(i,m)).join("");
+  }
+
+  // Templates — Tests
+  function createRowTemplate(tIdx, cIdx, row){
+    const classVal = row?.class ?? "";
+    const varVal = row?.var ?? `obj${cIdx+1}`;
+    const args = row?.args ?? [];
+    return `
+      <div class="space-y-2 border border-base-100 rounded-box p-3" data-create-index="${cIdx}">
+        <div class="grid grid-cols-12 gap-3 items-end">
+          <div class="col-span-5 form-control">
+            <label class="label"><span class="label-text font-medium">Class</span></label>
+            <input type="text" class="input input-bordered w-full" data-role="create-class" placeholder="Counter" value="${classVal}">
+          </div>
+          <div class="col-span-5 form-control">
+            <label class="label"><span class="label-text font-medium">Var name</span></label>
+            <input type="text" class="input input-bordered w-full" data-role="create-var" placeholder="c" value="${varVal}">
+          </div>
+          <div class="col-span-2 flex justify-end">
+            <button type="button" class="btn btn-ghost text-error mb-1" data-action="remove-create">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
+                <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Constructor args (ordered)</span></label>
+          <input type="text" class="input input-bordered w-full" data-role="create-args" placeholder='e.g. 10, "hi", true' value="${argsToField(args)}">
+          <p class="text-xs opacity-60 mt-1">Enter comma‑separated literals. Types inferred (true/false, numbers, strings).</p>
+        </div>
+      </div>
+    `;
+  }
+
+  function callRowTemplate(tIdx, aIdx, row){
+    const varVal = row?.var ?? "c";
+    const methodVal = row?.method ?? "";
+    const args = row?.args ?? [];
+    const modeExpected = !("exception" in (row||{}));
+    return `
+      <div class="space-y-2 border border-base-100 rounded-box p-3" data-action-index="${aIdx}">
+        <div class="grid grid-cols-12 gap-3 items-end">
+          <div class="col-span-4 form-control">
+            <label class="label"><span class="label-text font-medium">Var</span></label>
+            <input type="text" class="input input-bordered w-full" data-role="call-var" placeholder="c" value="${varVal}">
+          </div>
+          <div class="col-span-6 form-control">
+            <label class="label"><span class="label-text font-medium">Method</span></label>
+            <input type="text" class="input input-bordered w-full" data-role="call-method" placeholder="increment" value="${methodVal}">
+          </div>
+          <div class="col-span-2 flex justify-end">
+            <button type="button" class="btn btn-ghost text-error mb-1" data-action="remove-call">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
+                <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Call args (ordered)</span></label>
+          <input type="text" class="input input-bordered w-full" data-role="call-args" placeholder='e.g. 3, "abc"' value="${argsToField(args)}">
+        </div>
+
+        <div class="join">
+          <input class="join-item btn btn-sm" type="button" value="Expected" data-action="set-mode-expected">
+          <input class="join-item btn btn-sm" type="button" value="Exception" data-action="set-mode-exception">
+        </div>
+        <div class="grid sm:grid-cols-2 gap-3 mb-2">
+          <div class="${modeExpected? '' : 'hidden'}" data-role="expected-wrap">
+            <label class="label"><span class="label-text font-medium">Expected return</span></label>
+            <input type="text" class="input input-bordered w-full" data-role="call-expected" placeholder="e.g., 5" value="${valueToField(row?.expected ?? "")}">
+          </div>
+          <div class="${modeExpected? 'hidden' : ''}" data-role="exception-wrap">
+            <label class="label"><span class="label-text font-medium">Exception class</span></label>
+            <input type="text" class="input input-bordered w-full" data-role="call-exception" placeholder="ValueError" value="${row?.exception ?? ""}">
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function testCardTemplate(idx, t){
+    const n = idx+1;
+    const createsHTML = (t.setup||[]).map((r,ri)=>createRowTemplate(idx, ri, r)).join("");
+    const callsHTML = (t.actions||[]).map((r,ri)=>callRowTemplate(idx, ri, r)).join("");
+    return `
+      <div class="space-y-3 border border-base-100 rounded-box px-4" data-test-index="${idx}">
+        <div class="flex items-center justify-between my-2">
+          <div class="w-auto font-medium text-lg">Test #${n}</div>
+          <div class="flex items-center gap-1">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicate-test" title="Duplicate">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M11.25 4.25v-2.5h-9.5v9.5h2.5m.5-6.5v9.5h9.5v-9.5z"/>
+              </svg>
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm text-error" data-action="remove-test" ${tests.length<=1?'disabled':''} title="Remove">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
+                <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Test name</span></label>
+          <input type="text" class="input input-bordered w-full" data-role="test-name" placeholder="test${n}" value="${t.name ?? `test${n}`}">
+        </div>
+
+        <div class="space-y-2">
+          <div class="text-sm font-semibold">Setup (create instances)</div>
+          <div data-role="setup" class="space-y-3">
+            ${createsHTML}
+          </div>
+          <div class="flex justify-center mt-2">
+            <button type="button" class="btn btn-circle btn-outline btn-sm" data-action="add-create">+</button>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <div class="text-sm font-semibold">Actions (call methods)</div>
+          <div data-role="actions" class="space-y-3">
+            ${callsHTML}
+          </div>
+          <div class="flex justify-center mt-2">
+            <button type="button" class="btn btn-circle btn-outline btn-sm" data-action="add-call">+</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTests(){
+    testsContainer.innerHTML = tests.map((t,i)=>testCardTemplate(i,t)).join("");
+  }
+
+  // Helpers
+  function argsToField(arr){
+    if(!Array.isArray(arr)) return "";
+    return arr.map(v => {
+      if (typeof v === "string") return JSON.stringify(v).replace(/^"|"$/g,""); // show without quotes
+      return String(v);
+    }).join(", ");
+  }
+  function valueToField(v){ return (v===null||v===undefined) ? "" : String(v); }
+
+  function parseListLiterals(s){
+    // naive CSV of literals: numbers, true/false, or strings (without quotes)
+    const parts = (s||"").split(",").map(x=>x.trim()).filter(x=>x.length>0);
+    return parts.map(tok=>{
+      if (tok === "true") return true;
+      if (tok === "false") return false;
+      if (!isNaN(Number(tok))) return tok.includes(".") ? Number(tok) : parseInt(tok,10);
+      // treat as string
+      return tok;
+    });
+  }
+
+  function coerceMethodsFromDOM(){
+    const cards = [...methodsContainer.querySelectorAll("[data-method-index]")];
+    methods = cards.map(card=>{
+      const name = card.querySelector('[data-role="method-name"]').value.trim();
+      const returns = card.querySelector('[data-role="method-returns"]').value;
+      const argRows = [...card.querySelectorAll('[data-role="method-args"] [data-arg-index]')];
+      const args = argRows.map((row, i)=>({
+        name: row.querySelector('[data-role="arg-name"]').value.trim() || `arg${i+1}`,
+        type: row.querySelector('[data-role="arg-type"]').value
+      }));
+      return { name, returns, args };
+    });
+  }
+
+  function coerceTestsFromDOM(){
+    const cards = [...testsContainer.querySelectorAll("[data-test-index]")];
+    tests = cards.map((card,i)=>{
+      const name = card.querySelector('[data-role="test-name"]').value.trim() || `test${i+1}`;
+
+      // setup
+      const setupWrap = card.querySelector('[data-role="setup"]');
+      const createRows = [...setupWrap.querySelectorAll('[data-create-index]')];
+      const setup = createRows.map(row=>{
+        const cls = row.querySelector('[data-role="create-class"]').value.trim();
+        const v = row.querySelector('[data-role="create-var"]').value.trim();
+        const argsField = row.querySelector('[data-role="create-args"]').value;
+        return { action:"create", class: cls, var: v, args: parseListLiterals(argsField) };
+      });
+
+      // actions
+      const actionsWrap = card.querySelector('[data-role="actions"]');
+      const callRows = [...actionsWrap.querySelectorAll('[data-action-index]')];
+      const actions = callRows.map(row=>{
+        const v = row.querySelector('[data-role="call-var"]').value.trim();
+        const m = row.querySelector('[data-role="call-method"]').value.trim();
+        const argsField = row.querySelector('[data-role="call-args"]').value;
+        const expectedWrap = row.querySelector('[data-role="expected-wrap"]');
+        if(!expectedWrap.classList.contains("hidden")){
+          const ev = row.querySelector('[data-role="call-expected"]').value.trim();
+          return { action:"call", var:v, method:m, args: parseListLiterals(argsField), expected: inferLiteral(ev) };
+        } else {
+          const ex = row.querySelector('[data-role="call-exception"]').value.trim();
+          return { action:"call", var:v, method:m, args: parseListLiterals(argsField), exception: ex };
+        }
+      });
+
+      return { name, setup, actions };
+    });
+  }
+
+  function inferLiteral(text){
+    if(text==="") return "";
+    if(text==="true") return true;
+    if(text==="false") return false;
+    if(!isNaN(Number(text))){ return text.includes(".") ? Number(text) : parseInt(text,10); }
+    return text;
+  }
+
+  function buildSpec(){
+    coerceMethodsFromDOM();
+    coerceTestsFromDOM();
+    return {
+      version: 1,
+      type: "oop",
+      description: descriptionEl.value || "",
+      class: {
+        name: classNameEl.value.trim(),
+        methods: methods.map(m=>({
+          name: m.name,
+          arguments: m.args.map(a=>({ name:a.name, type:a.type })),
+          ...(m.returns && m.returns!=="void" ? { returns: m.returns } : {})
+        }))
+      },
+      tests: tests
+    };
+  }
+
+  // Validation (client)
+  function clearErrors(){
+    [errClassName, errMethods, errTests, errTimeout, errMemory].forEach(e=>{ if(!e) return; e.textContent=""; e.classList.add("hidden"); });
+    [classNameEl, timeoutEl, memoryEl].forEach(el=>el?.classList.remove("input-error"));
+  }
+
+  function validateClient(){
+    clearErrors();
+    let ok = true;
+
+    if(!classNameEl.value.trim()){
+      ok=false; classNameEl.classList.add("input-error"); errClassName.textContent="Class name is required."; errClassName.classList.remove("hidden");
+    }
+
+    if(methods.length===0){
+      ok=false; errMethods.textContent="Add at least one method."; errMethods.classList.remove("hidden");
+    }
+    const seenMethods = new Set();
+    for(const m of methods){
+      if(!m.name){ ok=false; errMethods.textContent="Method names cannot be blank."; errMethods.classList.remove("hidden"); }
+      if(seenMethods.has(m.name)){ ok=false; errMethods.textContent="Method names must be unique."; errMethods.classList.remove("hidden"); }
+      seenMethods.add(m.name);
+      // arg name uniqueness per method
+      const seenArgs = new Set();
+      for(const a of m.args){
+        if(!a.name){ ok=false; errMethods.textContent="Argument names cannot be blank."; errMethods.classList.remove("hidden"); }
+        if(seenArgs.has(a.name)){ ok=false; errMethods.textContent="Argument names must be unique per method."; errMethods.classList.remove("hidden"); }
+        seenArgs.add(a.name);
+      }
+    }
+
+    const tVal = Number((timeoutEl?.value ?? "").trim());
+    const mVal = Number((memoryEl?.value ?? "").trim());
+    if(!Number.isInteger(tVal) || tVal<=0){
+      ok=false; timeoutEl.classList.add("input-error"); errTimeout.textContent="Enter a positive integer."; errTimeout.classList.remove("hidden");
+    }
+    if(!Number.isInteger(mVal) || mVal<=0){
+      ok=false; memoryEl.classList.add("input-error"); errMemory.textContent="Enter a positive integer."; errMemory.classList.remove("hidden");
+    }
+
+    if(tests.length===0){
+      ok=false; errTests.textContent="Add at least one test."; errTests.classList.remove("hidden");
+    }
+    return ok;
+  }
+
+  // Preview
+  function renderPreview(){
+    const spec = buildSpec();
+    specPreview.textContent = JSON.stringify(spec, null, 2);
+  }
+
+  // Methods: events
+  methodsContainer.addEventListener("click", (e)=>{
+    const card = e.target.closest("[data-method-index]");
+    if(!card) return;
+    const idx = parseInt(card.dataset.methodIndex,10);
+
+    if(e.target.closest("[data-action='remove-method']")){
+      if(methods.length<=1) return;
+      methods.splice(idx,1);
+      renderMethods(); renderPreview(); return;
+    }
+    if(e.target.closest("[data-action='duplicate-method']")){
+      const copy = structuredClone(methods[idx]);
+      copy.name = uniqueName(copy.name || "method", new Set(methods.map(m=>m.name)));
+      methods.splice(idx+1,0,copy);
+      renderMethods(); renderPreview(); return;
+    }
+    if(e.target.closest("[data-action='add-arg']")){
+      methods[idx].args = methods[idx].args || [];
+      const next = methods[idx].args.length + 1;
+      methods[idx].args.push({ name:`arg${next}`, type:"integer" });
+      renderMethods(); renderPreview(); return;
+    }
+    if(e.target.closest("[data-action='remove-arg']")){
+      const row = e.target.closest("[data-arg-index]");
+      const aIdx = parseInt(row.dataset.argIndex,10);
+      methods[idx].args.splice(aIdx,1);
+      renderMethods(); renderPreview(); return;
+    }
+  });
+  methodsContainer.addEventListener("input", ()=>{ coerceMethodsFromDOM(); renderPreview(); });
+
+  // Tests: events
+  testsContainer.addEventListener("input", renderPreview);
+  testsContainer.addEventListener("change", renderPreview);
+  testsContainer.addEventListener("click", (e)=>{
+    const card = e.target.closest("[data-test-index]");
+    if(!card) return;
+    const idx = parseInt(card.dataset.testIndex,10);
+
+    if(e.target.closest("[data-action='remove-test']")){
+      if(tests.length<=1) return;
+      tests.splice(idx,1); renderTests(); renderPreview(); return;
+    }
+    if(e.target.closest("[data-action='duplicate-test']")){
+      coerceTestsFromDOM();
+      const t = structuredClone(tests[idx]);
+      t.name = uniqueName(t.name || `test${idx+1}`, new Set(tests.map(x=>x.name)));
+      tests.splice(idx+1,0,t); renderTests(); renderPreview(); return;
+    }
+    if(e.target.closest("[data-action='add-create']")){
+      tests[idx].setup = tests[idx].setup || [];
+      const next = tests[idx].setup.length + 1;
+      tests[idx].setup.push({ action:"create", class: classNameEl.value.trim() || "Counter", var:`obj${next}`, args: [] });
+      renderTests(); renderPreview(); return;
+    }
+    if(e.target.closest("[data-action='remove-create']")){
+      const row = e.target.closest("[data-create-index]");
+      const cIdx = parseInt(row.dataset.createIndex,10);
+      (tests[idx].setup ||= []).splice(cIdx,1);
+      renderTests(); renderPreview(); return;
+    }
+    if(e.target.closest("[data-action='add-call']")){
+      (tests[idx].actions ||= []).push({ action:"call", var:"c", method:"", args:[], expected:"" });
+      renderTests(); renderPreview(); return;
+    }
+    if(e.target.closest("[data-action='remove-call']")){
+      const row = e.target.closest("[data-action-index]");
+      const aIdx = parseInt(row.dataset.actionIndex,10);
+      (tests[idx].actions ||= []).splice(aIdx,1);
+      renderTests(); renderPreview(); return;
+    }
+    if(e.target.closest("[data-action='set-mode-expected']")){
+      const row = e.target.closest("[data-action-index]");
+      const expectedWrap = row.querySelector('[data-role="expected-wrap"]');
+      const exceptionWrap = row.querySelector('[data-role="exception-wrap"]');
+      expectedWrap.classList.remove("hidden"); exceptionWrap.classList.add("hidden"); renderPreview(); return;
+    }
+    if(e.target.closest("[data-action='set-mode-exception']")){
+      const row = e.target.closest("[data-action-index]");
+      const expectedWrap = row.querySelector('[data-role="expected-wrap"]');
+      const exceptionWrap = row.querySelector('[data-role="exception-wrap"]');
+      expectedWrap.classList.add("hidden"); exceptionWrap.classList.remove("hidden"); renderPreview(); return;
+    }
+  });
+
+  function uniqueName(base, set){
+    let c = base; if(!set.has(c)) return c;
+    let i=2; while(set.has(`${base}-${i}`)) i++; return `${base}-${i}`;
+  }
+
+  // Global inputs -> preview
+  ["input","change"].forEach(evt=>{
+    if(descriptionEl) descriptionEl.addEventListener(evt, renderPreview);
+    if(classNameEl) classNameEl.addEventListener(evt, renderPreview);
+    if(timeoutEl) timeoutEl.addEventListener(evt, renderPreview);
+    if(memoryEl) memoryEl.addEventListener(evt, renderPreview);
+  });
+
+  // Add buttons
+  if(addMethodBtn){
+    addMethodBtn.addEventListener("click", ()=>{
+      methods.push({ name:"", returns:"void", args:[] });
+      renderMethods(); renderPreview();
+    });
+  }
+  if(addTestBtn){
+    addTestBtn.addEventListener("click", ()=>{
+      const next = tests.length + 1;
+      tests.push({
+        name:`test${next}`,
+        setup:[ { action:"create", class: classNameEl.value.trim() || "Counter", var:"c", args:[] } ],
+        actions:[ { action:"call", var:"c", method:"", args:[], expected:"" } ]
+      });
+      renderTests(); renderPreview();
+    });
+  }
+
+  // Copy / Validate / Save
+  if(copyBtn){
+    copyBtn.addEventListener("click", async ()=>{
+      try{ await navigator.clipboard.writeText(specPreview.textContent); }catch{
+        const t=document.createElement("textarea"); t.value=specPreview.textContent; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+      }
+      show(toastCopy);
+    });
+  }
+
+  if(validateBtn){
+    validateBtn.addEventListener("click", async ()=>{
+      renderPreview();
+      if(!validateClient()){ show(toastErr); return; }
+      try{
+        const res = await fetch("{% url 'oop-validate' %}", {
+          method:"POST", headers:{ "Content-Type":"application/json", "X-CSRFToken": csrftoken },
+          body: specPreview.textContent
+        });
+        const data = await res.json().catch(()=>({}));
+        (res.ok && data.ok) ? show(toastOk) : show(toastErr);
+      }catch(e){ console.error(e); show(toastErr); }
+    });
+  }
+
+  if(saveBtn){
+    saveBtn.addEventListener("click", async ()=>{
+      renderPreview();
+      if(!validateClient()){ show(toastSaveErr); return; }
+
+      const specObj = JSON.parse(specPreview.textContent);
+      const payload = {
+        spec: specObj,
+        timeout_seconds: Number((timeoutEl?.value ?? "").trim()),
+        memory_limit_mb: Number((memoryEl?.value ?? "").trim()),
+        starter_code: starterEl ? starterEl.value : ""
+      };
+
+      try{
+        const url = new URL("{% url 'oop-save' %}", window.location.origin);
+        if(currentQuestionId) url.searchParams.set("id", currentQuestionId);
+
+        const res = await fetch(url.toString(), {
+          method:"POST", headers:{ "Content-Type":"application/json", "X-CSRFToken": csrftoken },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(()=>({}));
+        if(res.ok && data.ok){ currentQuestionId = data.id; show(toastSaveOk); }
+        else { show(toastSaveErr); }
+      }catch(e){ console.error(e); show(toastSaveErr); }
+    });
+  }
+
+  // Initial state
+  methods = [
+    { name:"__init__", returns:"void", args:[] },
+    { name:"increment", returns:"void", args:[] },
+    { name:"get", returns:"integer", args:[] }
+  ];
+  tests = [{
+    name:"simpleIncrement",
+    setup:[ { action:"create", class:"Counter", var:"c", args:[] } ],
+    actions:[
+      { action:"call", var:"c", method:"increment", args:[] },
+      { action:"call", var:"c", method:"get", args:[], expected:1 }
+    ]
+  }];
+
+  renderMethods();
+  renderTests();
+  renderPreview();
+})();
+</script>
+
+{% endblock %}
