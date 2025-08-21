@@ -25,20 +25,20 @@
                     <div class="form-control">
                         <label class="label block">
                             <span class="label-text font-medium">
-                                Description <span class="opacity-60 text-xs">(shown to students)</span>
+                                Description
+                                <span class="opacity-60 text-xs">(shown to students)</span>
                             </span>
                         </label>
                         <textarea id="description" class="textarea textarea-bordered bg-base-100 w-full h-24"
                             placeholder="Write a function factorial(n) that returns n! for n ≥ 0..."></textarea>
                     </div>
 
+                    <div class="divider my-0 w-auto text-lg font-bold mb-6">Function</div>
                     <!-- Function signature -->
                     <div class="space-y-3 border border-base-100 rounded-box p-4">
-                        <div class="divider my-0 w-auto">Function</div>
-
                         <div class="form-control">
                             <label class="label block">
-                                <span class="label-text font-semibold">Function name</span>
+                                <span class="label-text font-medium">Function name</span>
                             </label>
                             <input id="fn_name" type="text" class="input input-bordered w-full"
                                 placeholder="factorial" />
@@ -46,13 +46,11 @@
                         </div>
 
                         <div class="space-y-2">
-                            <div class="flex items-center justify-between">
-                                <div class="font-semibold">Arguments</div>
-                                <button id="addArgBtn" type="button" class="btn btn-outline btn-sm">+ Add
-                                    argument</button>
-                            </div>
-
                             <div id="argsContainer" class="space-y-3"></div>
+                            <div class="flex justify-center mt-2">
+                                <button id="addArgBtn" type="button"
+                                    class="btn btn-circle btn-outline btn-sm">+</button>
+                            </div>
                             <p class="text-error text-xs mt-1 hidden" id="err_args"></p>
                         </div>
                     </div>
@@ -61,25 +59,25 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="form-control">
                             <label class="label block">
-                                <span class="label-text font-semibold">Timeout (seconds)</span>
+                                <span class="label-text font-medium">Timeout (seconds)</span>
                             </label>
                             <input id="timeout_seconds" type="number" min="1" step="1"
                                 class="input input-bordered w-full" value="{{ timeout_default|default:5 }}">
                             <p class="text-error text-xs mt-1 hidden" id="err_timeout"></p>
                             <label class="label">
-                                <span class="label-text-alt opacity-70">Max time per test execution.</span>
+                                <span class="opacity-60 text-xs">Max time per test execution.</span>
                             </label>
                         </div>
 
                         <div class="form-control">
                             <label class="label block">
-                                <span class="label-text font-semibold">Memory limit (MB)</span>
+                                <span class="label-text font-medium">Memory limit (MB)</span>
                             </label>
                             <input id="memory_limit_mb" type="number" min="16" step="1"
                                 class="input input-bordered w-full" value="{{ memory_default|default:256 }}">
                             <p class="text-error text-xs mt-1 hidden" id="err_memory"></p>
                             <label class="label">
-                                <span class="label-text-alt opacity-70">Max memory per test execution.</span>
+                                <span class="opacity-60 text-xs">Max memory per test execution.</span>
                             </label>
                         </div>
                     </div>
@@ -87,12 +85,12 @@
                     <!-- Starter Code (NOT part of JSON spec) -->
                     <div class="form-control">
                         <label class="label block">
-                            <span class="label-text font-semibold">Starter code (optional)</span>
+                            <span class="label-text font-medium">Starter code (optional)</span>
                         </label>
                         <textarea id="starter_code" class="textarea textarea-bordered bg-base-100 w-full h-28"
                             placeholder="def factorial(n):&#10;    # TODO: implement&#10;    pass">{{ starter_default|default:'' }}</textarea>
                         <label class="label">
-                            <span class="label-text-alt opacity-70">
+                            <span class="opacity-60 text-xs">
                                 Prefilled in the student's editor. This is <strong>not</strong> stored in the JSON spec.
                             </span>
                         </label>
@@ -100,11 +98,11 @@
 
                     <!-- Tests -->
                     <div class="space-y-3">
-                        <div class="flex items-center justify-between">
-                            <div class="divider my-0 w-auto">Tests</div>
-                            <button id="addTestBtn" type="button" class="btn btn-outline btn-sm">+ Add test</button>
-                        </div>
+                        <div class="divider my-0 w-auto text-lg font-bold mb-6">Tests</div>
                         <div id="testsContainer" class="space-y-6"></div>
+                        <div class="flex justify-center mt-2">
+                            <button id="addTestBtn" type="button" class="btn btn-circle btn-outline btn-sm">+</button>
+                        </div>
                         <p class="text-error text-xs mt-1 hidden" id="err_tests"></p>
                     </div>
                 </form>
@@ -212,16 +210,20 @@
             return `
     <div class="flex items-end gap-3" data-arg-index="${idx}">
       <div class="form-control flex-1">
-        <label class="label"><span class="label-text font-semibold">Name</span></label>
+        <label class="label"><span class="label-text font-medium">Arg Name</span></label>
         <input type="text" class="input input-bordered w-full" data-role="arg-name"
                placeholder="arg${n}" value="${name}">
       </div>
       <div class="form-control w-40">
-        <label class="label"><span class="label-text font-semibold">Type</span></label>
+        <label class="label"><span class="label-text font-medium">Arg Type</span></label>
         <select class="select select-bordered w-full" data-role="arg-type">${options}</select>
       </div>
       <button type="button" class="btn btn-ghost text-error mb-1"
-              data-action="remove-arg" ${args.length <= 1 ? 'disabled' : ''}>Remove</button>
+              data-action="remove-arg" ${args.length <= 1 ? 'disabled' : ''}>
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
+        <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+      </svg>
+      </button>
     </div>
   `;
         }
@@ -234,17 +236,25 @@
             const exceptionChecked = !modeExpected ? "checked" : "";
 
             return `
-      <div class="space-y-3 border border-base-100 rounded-box p-4" data-test-index="${idx}">
-        <div class="flex items-center justify-between">
-          <div class="divider my-0 w-auto">Test #${n}</div>
+      <div class="space-y-3 border border-2 border-base-100 rounded-box px-4" data-test-index="${idx}">
+        <div class="flex items-center justify-between my-2">
+          <div class="w-auto font-medium text-lg">Test #${n}</div>
           <div class="flex items-center gap-1">
-            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicate-test">Duplicate</button>
-            <button type="button" class="btn btn-ghost btn-sm text-error" data-action="remove-test" ${tests.length <= 1 ? 'disabled' : ''}>Remove</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicate-test">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M11.25 4.25v-2.5h-9.5v9.5h2.5m.5-6.5v9.5h9.5v-9.5z"/>
+                </svg>
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm text-error" data-action="remove-test" ${tests.length <= 1 ? 'disabled' : ''}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
+                    <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+                </svg>
+            </button>
           </div>
         </div>
 
         <div class="form-control">
-          <label class="label block"><span class="label-text font-semibold">Test name</span></label>
+          <label class="label block"><span class="label-text font-medium">Test name</span></label>
           <input type="text" class="input input-bordered w-full" data-role="test-name" placeholder="test${n}" value="${t.name ?? `test${n}`}">
           <p class="text-error text-xs mt-1 hidden" data-err="name"></p>
         </div>
@@ -259,16 +269,16 @@
           <input class="join-item btn btn-sm" type="button" value="Expected" data-action="set-mode-expected">
           <input class="join-item btn btn-sm" type="button" value="Exception" data-action="set-mode-exception">
         </div>
-        <div class="grid sm:grid-cols-2 gap-3">
+        <div class="grid sm:grid-cols-2 gap-3 mb-4">
           <div class="${modeExpected ? '' : 'hidden'}" data-role="expected-wrap">
-            <label class="label block"><span class="label-text font-semibold">Expected value</span></label>
+            <label class="label block"><span class="label-text font-medium">Expected value</span></label>
             <input type="text" class="input input-bordered w-full" data-role="expected"
                    placeholder="e.g., 6" value="${valueToField(t.expected ?? "")}">
-            <p class="text-xs opacity-70 mt-1">Enter a JSON‑like literal (e.g., <code>6</code>, <code>3.14</code>, <code>true</code>, or a quoted string without quotes is fine; we’ll infer types where possible).</p>
+            <p class="opacity-40 text-xs mt-1">Enter a JSON‑like literal (e.g., <code>6</code>, <code>3.14</code>, <code>true</code>, or a quoted string without quotes is fine; we’ll infer types where possible).</p>
             <p class="text-error text-xs mt-1 hidden" data-err="expected"></p>
           </div>
           <div class="${modeExpected ? 'hidden' : ''}" data-role="exception-wrap">
-            <label class="label block"><span class="label-text font-semibold">Exception class name</span></label>
+            <label class="label block"><span class="label-text font-medium">Exception class name</span></label>
             <input type="text" class="input input-bordered w-full" data-role="exception" placeholder="ValueError" value="${t.exception ?? ""}">
             <p class="text-error text-xs mt-1 hidden" data-err="exception"></p>
           </div>
@@ -283,7 +293,7 @@
                 const control = argInputControl(a.type, v);
                 return `
         <div class="form-control" data-arg-name="${a.name}">
-          <label class="label block"><span class="label-text font-semibold">${a.name} <span class="badge badge-outline ml-2">${a.type}</span></span></label>
+          <label class="label block"><span class="label-text font-medium">${a.name} <span class="badge badge-outline badge-sm ml-2">${a.type}</span></span></label>
           ${control}
           <p class="text-error text-xs mt-1 hidden" data-err="arg"></p>
         </div>
@@ -576,6 +586,34 @@
             while (names.has(`${c}-${i}`)) i++;
             return `${c}-${i}`;
         }
+
+        function defaultForType(t) {
+            if (t === "integer") return 0;
+            if (t === "float") return 0;
+            if (t === "bool") return false;
+            return ""; // string (or unknown)
+        }
+
+        if (addTestBtn) {
+            addTestBtn.addEventListener("click", () => {
+                // build default args object based on current signature
+                const baseArgs = {};
+                args.forEach(a => { baseArgs[a.name] = defaultForType(a.type); });
+
+                const next = tests.length + 1;
+                tests.push({
+                    name: `test${next}`,
+                    mode: "expected",
+                    args: baseArgs,
+                    expected: "",
+                    exception: null
+                });
+
+                renderTests();
+                renderPreview();
+            });
+        }
+
 
         // ---- Global inputs -> preview ----
         ["input", "change"].forEach(evt => {

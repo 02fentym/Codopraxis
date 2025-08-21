@@ -37,25 +37,25 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="form-control">
                             <label class="label block">
-                                <span class="label-text font-semibold">Timeout (seconds)</span>
+                                <span class="label-text font-medium">Timeout (seconds)</span>
                             </label>
                             <input id="timeout_seconds" type="number" min="1" step="1"
                                 class="input input-bordered w-full" value="{{ timeout_default }}">
                             <p class="text-error text-xs mt-1 hidden" id="err_timeout"></p>
                             <label class="label">
-                                <span class="label-text-alt opacity-70">Max time per test execution.</span>
+                                <span class="opacity-60 text-xs">Max time per test execution.</span>
                             </label>
                         </div>
 
                         <div class="form-control">
                             <label class="label block">
-                                <span class="label-text font-semibold">Memory limit (MB)</span>
+                                <span class="label-text font-medium">Memory limit (MB)</span>
                             </label>
                             <input id="memory_limit_mb" type="number" min="16" step="1"
                                 class="input input-bordered w-full" value="{{ memory_default }}">
                             <p class="text-error text-xs mt-1 hidden" id="err_memory"></p>
                             <label class="label">
-                                <span class="label-text-alt opacity-70">Max memory per test execution.</span>
+                                <span class="opacity-60 text-xs">Max memory per test execution.</span>
                             </label>
                         </div>
                     </div>
@@ -63,12 +63,12 @@
                     <!-- Starter Code (NOT part of JSON spec) -->
                     <div class="form-control">
                         <label class="label block">
-                            <span class="label-text font-semibold">Starter code (optional)</span>
+                            <span class="label-text font-medium">Starter code (optional)</span>
                         </label>
                         <textarea id="starter_code" class="textarea textarea-bordered bg-base-100 w-full h-24"
                             placeholder="# e.g., skeleton code shown to students">{{ starter_default }}</textarea>
                         <label class="label">
-                            <span class="label-text-alt opacity-70">
+                            <span class="opacity-60 text-xs">
                                 Prefilled in the student's editor. This is <strong>not</strong> stored in the JSON spec.
                             </span>
                         </label>
@@ -79,8 +79,8 @@
                     <div id="testsContainer" class="space-y-6"></div>
 
                     <!-- Add Test -->
-                    <div class="flex gap-2">
-                        <button id="addTestBtn" type="button" class="btn btn-outline">+ Add Test</button>
+                    <div class="flex gap-2 justify-center">
+                        <button id="addTestBtn" type="button" class="btn btn-circle btn-outline btn-sm">+</button>
                     </div>
                 </form>
             </div>
@@ -241,13 +241,19 @@
     const nameId   = `name_${n}`;
 
     return `
-      <div class="space-y-3 border border-3 border-base-100 rounded-box p-4" data-test-index="${idx}">
-        <div class="flex items-center justify-between">
-          <div class="divider my-0 w-auto">Test #${n}</div>
+      <div class="space-y-3 border border-2 border-base-100 rounded-box px-4" data-test-index="${idx}">
+        <div class="flex items-center justify-between my-2">
+          <div class="my-0 w-auto font-medium text-lg">Test #${n}</div>
           <div class="flex items-center gap-1">
-            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicateTest">Duplicate</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicateTest">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M11.25 4.25v-2.5h-9.5v9.5h2.5m.5-6.5v9.5h9.5v-9.5z"/>
+              </svg>
+            </button>
             <button type="button" class="btn btn-ghost btn-sm text-error" data-action="removeTest"${tests.length === 1 ? ' disabled' : ''}>
-              Remove
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
+                    <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+              </svg>
             </button>
           </div>
         </div>
@@ -255,39 +261,39 @@
         <!-- Test name -->
         <div class="form-control">
           <label class="label block">
-            <span class="label-text font-semibold">Test name</span>
+            <span class="label-text font-medium">Test name</span>
           </label>
           <input id="${nameId}" data-role="name" type="text" class="input input-bordered w-full"
                  placeholder="test${n}" value="${test.name || `test${n}`}" />
           <p class="text-error text-xs mt-1 hidden" data-err="name"></p>
           <label class="label">
-            <span class="label-text-alt opacity-70">Unique within this question.</span>
+            <span class="opacity-60 text-xs">Unique within this question.</span>
           </label>
         </div>
 
         <!-- stdin -->
         <div class="form-control">
           <label class="label block">
-            <span class="label-text font-semibold">stdin</span>
+            <span class="label-text font-medium">stdin</span>
           </label>
           <textarea id="${stdinId}" data-role="stdin" class="textarea textarea-bordered bg-base-100 w-full h-28"
                     placeholder="5&#10;4">${test.stdin ?? ""}</textarea>
           <p class="text-error text-xs mt-1 hidden" data-err="stdin"></p>
           <label class="label">
-            <span class="label-text-alt opacity-70">Multiline OK. Piped to the program’s stdin.</span>
+            <span class="opacity-60 text-xs">Multiline OK. Piped to the program’s stdin.</span>
           </label>
         </div>
 
         <!-- stdout -->
         <div class="form-control">
           <label class="label block">
-            <span class="label-text font-semibold">stdout</span>
+            <span class="label-text font-medium">stdout</span>
           </label>
           <input id="${stdoutId}" data-role="stdout" type="text" class="input input-bordered w-full"
                  placeholder="9" value="${(test.stdout ?? "").replace(/\n$/, "")}" />
           <p class="text-error text-xs mt-1 hidden" data-err="stdout"></p>
-          <label class="label">
-            <span class="label-text-alt opacity-70">We’ll ensure a trailing newline (<code>\\n</code>) in the spec.</span>
+          <label class="label mb-4">
+            <span class="opacity-60 text-xs">We’ll ensure a trailing newline (<code>\\n</code>) in the spec.</span>
           </label>
         </div>
       </div>
