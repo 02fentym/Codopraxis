@@ -1,0 +1,671 @@
+{% extends "main.html" %}
+{% block title %}Function Builder{% endblock %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Breadcrumbs -->
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li><a href="{% url 'home' %}" class="link">Home</a></li>
+            <li><span class="opacity-70">Code Questions</span></li>
+            <li class="font-semibold">Function Builder</li>
+        </ul>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Left -->
+        <div class="card bg-base-200">
+            <div class="card-body space-y-6">
+                <h1 class="card-title text-3xl">Function Builder</h1>
+
+                <form id="builder-form" method="post" class="space-y-6">
+                    {% csrf_token %}
+
+                    <!-- Description -->
+                    <div class="form-control">
+                        <label class="label block">
+                            <span class="label-text font-medium">
+                                Description <span class="opacity-60 text-xs">(shown to students)</span>
+                            </span>
+                        </label>
+                        <textarea id="description" class="textarea textarea-bordered bg-base-100 w-full h-24"
+                            placeholder="Write a function factorial(n) that returns n! for n ≥ 0..."></textarea>
+                    </div>
+
+                    <!-- Function signature -->
+                    <div class="space-y-3 border border-base-100 rounded-box p-4">
+                        <div class="divider my-0 w-auto">Function</div>
+
+                        <div class="form-control">
+                            <label class="label block">
+                                <span class="label-text font-semibold">Function name</span>
+                            </label>
+                            <input id="fn_name" type="text" class="input input-bordered w-full"
+                                placeholder="factorial" />
+                            <p class="text-error text-xs mt-1 hidden" id="err_fn_name"></p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <div class="font-semibold">Arguments</div>
+                                <button id="addArgBtn" type="button" class="btn btn-outline btn-sm">+ Add
+                                    argument</button>
+                            </div>
+
+                            <div id="argsContainer" class="space-y-3"></div>
+                            <p class="text-error text-xs mt-1 hidden" id="err_args"></p>
+                        </div>
+                    </div>
+
+                    <!-- Limits -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label block">
+                                <span class="label-text font-semibold">Timeout (seconds)</span>
+                            </label>
+                            <input id="timeout_seconds" type="number" min="1" step="1"
+                                class="input input-bordered w-full" value="{{ timeout_default|default:5 }}">
+                            <p class="text-error text-xs mt-1 hidden" id="err_timeout"></p>
+                            <label class="label">
+                                <span class="label-text-alt opacity-70">Max time per test execution.</span>
+                            </label>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label block">
+                                <span class="label-text font-semibold">Memory limit (MB)</span>
+                            </label>
+                            <input id="memory_limit_mb" type="number" min="16" step="1"
+                                class="input input-bordered w-full" value="{{ memory_default|default:256 }}">
+                            <p class="text-error text-xs mt-1 hidden" id="err_memory"></p>
+                            <label class="label">
+                                <span class="label-text-alt opacity-70">Max memory per test execution.</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Starter Code (NOT part of JSON spec) -->
+                    <div class="form-control">
+                        <label class="label block">
+                            <span class="label-text font-semibold">Starter code (optional)</span>
+                        </label>
+                        <textarea id="starter_code" class="textarea textarea-bordered bg-base-100 w-full h-28"
+                            placeholder="def factorial(n):&#10;    # TODO: implement&#10;    pass">{{ starter_default|default:'' }}</textarea>
+                        <label class="label">
+                            <span class="label-text-alt opacity-70">
+                                Prefilled in the student's editor. This is <strong>not</strong> stored in the JSON spec.
+                            </span>
+                        </label>
+                    </div>
+
+                    <!-- Tests -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="divider my-0 w-auto">Tests</div>
+                            <button id="addTestBtn" type="button" class="btn btn-outline btn-sm">+ Add test</button>
+                        </div>
+                        <div id="testsContainer" class="space-y-6"></div>
+                        <p class="text-error text-xs mt-1 hidden" id="err_tests"></p>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right: Spec Preview + Actions -->
+        <div class="card bg-base-200 lg:sticky lg:top-6 h-fit">
+            <div class="card-body">
+                <h2 class="card-title text-2xl mb-2">Compiled Spec (Preview)</h2>
+
+                <div class="mockup-code text-xs bg-base-100">
+                    <pre><code id="specPreview">{
+  "version": 1,
+  "type": "function",
+  "description": "",
+  "function": { "name": "", "arguments": [] },
+  "tests": []
+}</code></pre>
+                </div>
+
+                <div class="mt-2 flex items-center gap-2">
+                    <button id="copyJsonBtn" type="button" class="btn btn-outline btn-sm">Copy JSON</button>
+                    <button id="validateBtn" type="button" class="btn btn-primary btn-sm">Validate JSON</button>
+                    <button id="saveBtn" type="button" class="btn btn-success btn-sm">Save</button>
+                </div>
+
+                <!-- Toasts -->
+                <div id="toastCopy" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-success"><span>Copied to clipboard.</span></div>
+                </div>
+                <div id="toastOk" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-success"><span>Spec is valid.</span></div>
+                </div>
+                <div id="toastErr" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-error"><span>Spec has issues. See highlights.</span></div>
+                </div>
+                <div id="toastSaveOk" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-success"><span>Saved.</span></div>
+                </div>
+                <div id="toastSaveErr" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-error"><span>Save failed. Fix errors and try again.</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const $ = (id) => document.getElementById(id);
+
+        // ---- DOM refs ----
+        const descriptionEl = $("description");
+        const fnNameEl = $("fn_name");
+        const argsContainer = $("argsContainer");
+        const addArgBtn = $("addArgBtn");
+
+        const timeoutEl = $("timeout_seconds");
+        const memoryEl = $("memory_limit_mb");
+        const starterEl = $("starter_code");
+
+        const testsContainer = $("testsContainer");
+        const addTestBtn = $("addTestBtn");
+
+        const specPreview = $("specPreview");
+        const copyBtn = $("copyJsonBtn");
+        const validateBtn = $("validateBtn");
+        const saveBtn = $("saveBtn");
+
+        const errFnName = $("err_fn_name");
+        const errArgs = $("err_args");
+        const errTests = $("err_tests");
+        const errTimeout = $("err_timeout");
+        const errMemory = $("err_memory");
+
+        const toastCopy = $("toastCopy");
+        const toastOk = $("toastOk");
+        const toastErr = $("toastErr");
+        const toastSaveOk = $("toastSaveOk");
+        const toastSaveErr = $("toastSaveErr");
+
+        function show(el, ms = 1800) { if (!el) return; el.classList.remove("hidden"); setTimeout(() => el.classList.add("hidden"), ms); }
+        function getCookie(name) { const v = document.cookie.split("; ").find(r => r.startsWith(name + "=")); return v ? decodeURIComponent(v.split("=")[1]) : null; }
+        const csrftoken = getCookie("csrftoken");
+
+        // ---- State ----
+        let args = [
+            // { name: "n", type: "integer" }
+        ];
+        let tests = [
+            // { name:"baseCase", mode:"expected", args:{}, expected:null, exception:null }
+        ];
+        let currentQuestionId = null;
+
+        const TYPE_OPTIONS = ["integer", "float", "string", "bool"];
+
+        // ---- Templates ----
+        function argRowTemplate(idx, a) {
+            const n = idx + 1;
+            const name = a?.name ?? "";
+            const type = a?.type ?? "integer";
+            const options = TYPE_OPTIONS.map(t => `<option value="${t}" ${t === type ? 'selected' : ''}>${t}</option>`).join("");
+
+            return `
+    <div class="flex items-end gap-3" data-arg-index="${idx}">
+      <div class="form-control flex-1">
+        <label class="label"><span class="label-text font-semibold">Name</span></label>
+        <input type="text" class="input input-bordered w-full" data-role="arg-name"
+               placeholder="arg${n}" value="${name}">
+      </div>
+      <div class="form-control w-40">
+        <label class="label"><span class="label-text font-semibold">Type</span></label>
+        <select class="select select-bordered w-full" data-role="arg-type">${options}</select>
+      </div>
+      <button type="button" class="btn btn-ghost text-error mb-1"
+              data-action="remove-arg" ${args.length <= 1 ? 'disabled' : ''}>Remove</button>
+    </div>
+  `;
+        }
+
+
+        function testCardTemplate(idx, t) {
+            const n = idx + 1;
+            const modeExpected = (t.mode ?? "expected") === "expected";
+            const expectedChecked = modeExpected ? "checked" : "";
+            const exceptionChecked = !modeExpected ? "checked" : "";
+
+            return `
+      <div class="space-y-3 border border-base-100 rounded-box p-4" data-test-index="${idx}">
+        <div class="flex items-center justify-between">
+          <div class="divider my-0 w-auto">Test #${n}</div>
+          <div class="flex items-center gap-1">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicate-test">Duplicate</button>
+            <button type="button" class="btn btn-ghost btn-sm text-error" data-action="remove-test" ${tests.length <= 1 ? 'disabled' : ''}>Remove</button>
+          </div>
+        </div>
+
+        <div class="form-control">
+          <label class="label block"><span class="label-text font-semibold">Test name</span></label>
+          <input type="text" class="input input-bordered w-full" data-role="test-name" placeholder="test${n}" value="${t.name ?? `test${n}`}">
+          <p class="text-error text-xs mt-1 hidden" data-err="name"></p>
+        </div>
+
+        <!-- Arg inputs -->
+        <div class="grid gap-3" data-role="arg-inputs">
+          ${renderArgInputsHTML(args, t.args || {})}
+        </div>
+
+        <!-- Expected vs Exception -->
+        <div class="join">
+          <input class="join-item btn btn-sm" type="button" value="Expected" data-action="set-mode-expected">
+          <input class="join-item btn btn-sm" type="button" value="Exception" data-action="set-mode-exception">
+        </div>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <div class="${modeExpected ? '' : 'hidden'}" data-role="expected-wrap">
+            <label class="label block"><span class="label-text font-semibold">Expected value</span></label>
+            <input type="text" class="input input-bordered w-full" data-role="expected"
+                   placeholder="e.g., 6" value="${valueToField(t.expected ?? "")}">
+            <p class="text-xs opacity-70 mt-1">Enter a JSON‑like literal (e.g., <code>6</code>, <code>3.14</code>, <code>true</code>, or a quoted string without quotes is fine; we’ll infer types where possible).</p>
+            <p class="text-error text-xs mt-1 hidden" data-err="expected"></p>
+          </div>
+          <div class="${modeExpected ? 'hidden' : ''}" data-role="exception-wrap">
+            <label class="label block"><span class="label-text font-semibold">Exception class name</span></label>
+            <input type="text" class="input input-bordered w-full" data-role="exception" placeholder="ValueError" value="${t.exception ?? ""}">
+            <p class="text-error text-xs mt-1 hidden" data-err="exception"></p>
+          </div>
+        </div>
+      </div>
+    `;
+        }
+
+        function renderArgInputsHTML(argDefs, values) {
+            return argDefs.map(a => {
+                const v = values?.[a.name] ?? "";
+                const control = argInputControl(a.type, v);
+                return `
+        <div class="form-control" data-arg-name="${a.name}">
+          <label class="label block"><span class="label-text font-semibold">${a.name} <span class="badge badge-outline ml-2">${a.type}</span></span></label>
+          ${control}
+          <p class="text-error text-xs mt-1 hidden" data-err="arg"></p>
+        </div>
+      `;
+            }).join("");
+        }
+
+        function argInputControl(type, v) {
+            if (type === "string") {
+                return `<textarea class="textarea textarea-bordered bg-base-100 w-full h-20" data-role="arg-value">${escapeHTML(v)}</textarea>`;
+            } else if (type === "bool") {
+                const val = String(v) === "true";
+                return `
+        <select class="select select-bordered w-full" data-role="arg-value">
+          <option value="true" ${val ? 'selected' : ''}>true</option>
+          <option value="false" ${!val ? 'selected' : ''}>false</option>
+        </select>`;
+            } else {
+                // integer / float use number input; allow blank
+                const step = (type === "integer") ? "1" : "any";
+                const val = (v === null || v === undefined) ? "" : v;
+                return `<input type="number" step="${step}" class="input input-bordered w-full" data-role="arg-value" value="${escapeAttr(val)}">`;
+            }
+        }
+
+        // ---- Renderers ----
+        function renderArgs() {
+            argsContainer.innerHTML = args.map((a, i) => argRowTemplate(i, a)).join("");
+        }
+        function renderTests() {
+            testsContainer.innerHTML = tests.map((t, i) => testCardTemplate(i, t)).join("");
+        }
+
+        // ---- Helpers ----
+        function escapeHTML(s) { return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+        function escapeAttr(s) { return String(s).replace(/"/g, '&quot;'); }
+        function valueToField(v) { return (v === null || v === undefined) ? "" : String(v); }
+
+        function parsePositiveInt(el) {
+            const n = Number((el?.value ?? "").trim());
+            return Number.isInteger(n) && n > 0 ? n : null;
+        }
+
+        function coerceArgsFromDOM() {
+            const rows = [...argsContainer.querySelectorAll("[data-arg-index]")];
+            args = rows.map((row, i) => {
+                const name = row.querySelector('[data-role="arg-name"]').value.trim() || `arg${i + 1}`;
+                const type = row.querySelector('[data-role="arg-type"]').value;
+                return { name, type };
+            });
+        }
+
+        function coerceTestsFromDOM() {
+            const cards = [...testsContainer.querySelectorAll("[data-test-index]")];
+            tests = cards.map((card, i) => {
+                const name = card.querySelector('[data-role="test-name"]').value.trim() || `test${i + 1}`;
+
+                // mode from visibility
+                const expectedWrap = card.querySelector('[data-role="expected-wrap"]');
+                const mode = expectedWrap.classList.contains("hidden") ? "exception" : "expected";
+
+                // read arg values in order
+                const argInputs = {};
+                args.forEach(a => {
+                    const fieldWrap = card.querySelector(`[data-arg-name="${CSS.escape(a.name)}"]`);
+                    if (!fieldWrap) return;
+                    let valEl = fieldWrap.querySelector('[data-role="arg-value"]');
+                    let raw = (valEl?.value ?? "");
+                    if (a.type === "bool") { raw = (raw === "true"); }
+                    else if (a.type === "integer") { raw = raw === "" ? null : parseInt(raw, 10); }
+                    else if (a.type === "float") { raw = raw === "" ? null : parseFloat(raw); }
+                    else { /* string */ }
+                    argInputs[a.name] = raw;
+                });
+
+                let expected = null, exception = null;
+                if (mode === "expected") {
+                    const e = card.querySelector('[data-role="expected"]').value.trim();
+                    expected = inferLiteral(e);
+                } else {
+                    exception = card.querySelector('[data-role="exception"]').value.trim();
+                }
+
+                return { name, mode, args: argInputs, expected, exception };
+            });
+        }
+
+        function inferLiteral(text) {
+            if (text === "") return "";
+            if (text === "true") return true;
+            if (text === "false") return false;
+            if (!isNaN(Number(text))) {
+                // preserve int vs float
+                return text.includes(".") ? Number(text) : parseInt(text, 10);
+            }
+            return text; // string
+        }
+
+        function buildSpec() {
+            coerceArgsFromDOM();
+            coerceTestsFromDOM();
+            return {
+                version: 1,
+                type: "function",
+                description: descriptionEl.value || "",
+                function: {
+                    name: fnNameEl.value.trim(),
+                    arguments: args.map(a => ({ name: a.name, type: a.type })),
+                },
+                tests: tests.map(t => {
+                    const base = { name: t.name, args: t.args };
+                    if (t.mode === "expected") {
+                        return { ...base, expected: t.expected };
+                    } else {
+                        return { ...base, exception: t.exception || "" };
+                    }
+                })
+            };
+        }
+
+        // ---- Validation (client-side) ----
+        function clearErrors() {
+            [errFnName, errArgs, errTests, errTimeout, errMemory].forEach(e => { if (!e) return; e.textContent = ""; e.classList.add("hidden"); });
+            [fnNameEl, timeoutEl, memoryEl].forEach(el => el?.classList.remove("input-error"));
+            [...testsContainer.querySelectorAll('[data-err]')].forEach(e => { e.textContent = ""; e.classList.add("hidden"); });
+        }
+
+        function validateClient() {
+            clearErrors();
+            let ok = true;
+
+            // function name
+            const name = fnNameEl.value.trim();
+            if (!name) {
+                ok = false;
+                fnNameEl.classList.add("input-error");
+                errFnName.textContent = "Function name is required.";
+                errFnName.classList.remove("hidden");
+            }
+
+            // args: must be non-empty, names unique & non-empty
+            if (args.length === 0) {
+                ok = false; errArgs.textContent = "At least one argument is required."; errArgs.classList.remove("hidden");
+            }
+            const seen = new Set();
+            for (const a of args) {
+                if (!a.name) {
+                    ok = false; errArgs.textContent = "Argument names cannot be blank."; errArgs.classList.remove("hidden");
+                }
+                if (seen.has(a.name)) {
+                    ok = false; errArgs.textContent = "Argument names must be unique."; errArgs.classList.remove("hidden");
+                }
+                seen.add(a.name);
+            }
+
+            // numeric limits
+            if (parsePositiveInt(timeoutEl) === null) {
+                ok = false; timeoutEl.classList.add("input-error"); errTimeout.textContent = "Enter a positive integer."; errTimeout.classList.remove("hidden");
+            }
+            if (parsePositiveInt(memoryEl) === null) {
+                ok = false; memoryEl.classList.add("input-error"); errMemory.textContent = "Enter a positive integer."; errMemory.classList.remove("hidden");
+            }
+
+            // tests: non-empty, names unique, args provided for all, mode valid, payload present
+            if (tests.length === 0) {
+                ok = false; errTests.textContent = "Add at least one test."; errTests.classList.remove("hidden");
+            }
+            const tnames = new Set();
+            [...testsContainer.querySelectorAll("[data-test-index]")].forEach((card, idx) => {
+                const nameEl = card.querySelector('[data-role="test-name"]');
+                const tname = nameEl.value.trim();
+                if (!tname) {
+                    ok = false; const e = card.querySelector('[data-err="name"]'); e.textContent = "Test name required."; e.classList.remove("hidden");
+                } else if (tnames.has(tname)) {
+                    ok = false; const e = card.querySelector('[data-err="name"]'); e.textContent = "Test name must be unique."; e.classList.remove("hidden");
+                } else {
+                    tnames.add(tname);
+                }
+
+                // arg presence
+                args.forEach(a => {
+                    const wrap = card.querySelector(`[data-arg-name="${CSS.escape(a.name)}"]`);
+                    if (!wrap) return;
+                    const errEl = wrap.querySelector('[data-err="arg"]');
+                    const valEl = wrap.querySelector('[data-role="arg-value"]');
+                    const raw = (valEl?.value ?? "");
+                    if (raw === "") {
+                        ok = false; errEl.textContent = `Value for "${a.name}" is required.`; errEl.classList.remove("hidden");
+                    }
+                });
+
+                // expected/exception presence
+                const expectedWrap = card.querySelector('[data-role="expected-wrap"]');
+                if (!expectedWrap.classList.contains("hidden")) {
+                    const v = card.querySelector('[data-role="expected"]').value.trim();
+                    if (v === "") {
+                        ok = false; const e = card.querySelector('[data-err="expected"]'); e.textContent = "Expected value required."; e.classList.remove("hidden");
+                    }
+                } else {
+                    const v = card.querySelector('[data-role="exception"]').value.trim();
+                    if (v === "") {
+                        ok = false; const e = card.querySelector('[data-err="exception"]'); e.textContent = "Exception class name required."; e.classList.remove("hidden");
+                    }
+                }
+            });
+
+            return ok;
+        }
+
+        // ---- Preview renderer ----
+        function renderPreview() {
+            const spec = buildSpec();
+            specPreview.textContent = JSON.stringify(spec, null, 2);
+        }
+
+        // ---- Events: args ----
+        argsContainer.addEventListener("change", e => {
+            const row = e.target.closest("[data-arg-index]");
+            if (!row) return;
+            coerceArgsFromDOM();
+            // Re-render tests' arg inputs to reflect signature changes
+            coerceTestsFromDOM();
+            renderTests();
+            renderPreview();
+        });
+        argsContainer.addEventListener("click", e => {
+            const row = e.target.closest("[data-arg-index]");
+            if (e.target.closest("[data-action='remove-arg']")) {
+                if (args.length <= 1) return;
+                const idx = parseInt(row.dataset.argIndex, 10);
+                args.splice(idx, 1);
+                renderArgs();
+                // update tests arg inputs
+                coerceTestsFromDOM();
+                renderTests();
+                renderPreview();
+            }
+        });
+        if (addArgBtn) {
+            addArgBtn.addEventListener("click", () => {
+                const next = args.length + 1;
+                args.push({ name: `arg${next}`, type: "integer" });
+                renderArgs();
+                // add missing fields to tests
+                coerceTestsFromDOM();
+                renderTests();
+                renderPreview();
+            });
+        }
+
+        // ---- Events: tests ----
+        testsContainer.addEventListener("input", renderPreview);
+        testsContainer.addEventListener("change", renderPreview);
+        testsContainer.addEventListener("click", e => {
+            const card = e.target.closest("[data-test-index]");
+            if (!card) return;
+            const idx = parseInt(card.dataset.testIndex, 10);
+
+            if (e.target.closest("[data-action='remove-test']")) {
+                if (tests.length <= 1) return;
+                tests.splice(idx, 1);
+                renderTests(); renderPreview(); return;
+            }
+            if (e.target.closest("[data-action='duplicate-test']")) {
+                coerceTestsFromDOM();
+                const t = structuredClone(tests[idx]);
+                t.name = uniqueTestName(t.name || `test${idx + 1}`);
+                tests.splice(idx + 1, 0, t);
+                renderTests(); renderPreview(); return;
+            }
+            if (e.target.closest("[data-action='set-mode-expected']")) {
+                const expectedWrap = card.querySelector('[data-role="expected-wrap"]');
+                const exceptionWrap = card.querySelector('[data-role="exception-wrap"]');
+                expectedWrap.classList.remove("hidden"); exceptionWrap.classList.add("hidden");
+                renderPreview(); return;
+            }
+            if (e.target.closest("[data-action='set-mode-exception']")) {
+                const expectedWrap = card.querySelector('[data-role="expected-wrap"]');
+                const exceptionWrap = card.querySelector('[data-role="exception-wrap"]');
+                expectedWrap.classList.add("hidden"); exceptionWrap.classList.remove("hidden");
+                renderPreview(); return;
+            }
+        });
+
+        function uniqueTestName(base) {
+            const names = new Set(tests.map(t => t.name));
+            let c = base || "test";
+            if (!names.has(c)) return c;
+            let i = 2;
+            while (names.has(`${c}-${i}`)) i++;
+            return `${c}-${i}`;
+        }
+
+        // ---- Global inputs -> preview ----
+        ["input", "change"].forEach(evt => {
+            if (descriptionEl) descriptionEl.addEventListener(evt, renderPreview);
+            if (fnNameEl) fnNameEl.addEventListener(evt, renderPreview);
+            if (timeoutEl) timeoutEl.addEventListener(evt, renderPreview);
+            if (memoryEl) memoryEl.addEventListener(evt, renderPreview);
+        });
+
+        // ---- Copy JSON ----
+        if (copyBtn) {
+            copyBtn.addEventListener("click", async () => {
+                try {
+                    await navigator.clipboard.writeText(specPreview.textContent);
+                } catch {
+                    const t = document.createElement("textarea");
+                    t.value = specPreview.textContent; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+                }
+                show(toastCopy);
+            });
+        }
+
+        // ---- Validate (server) ----
+        if (validateBtn) {
+            validateBtn.addEventListener("click", async () => {
+                renderPreview();
+                if (!validateClient()) { show(toastErr); return; }
+                try {
+                    const res = await fetch("{% url 'function-validate' %}", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+                        body: specPreview.textContent
+                    });
+                    if (!res.ok) { show(toastErr); return; }
+                    const data = await res.json();
+                    data.ok ? show(toastOk) : show(toastErr);
+                } catch (e) { console.error(e); show(toastErr); }
+            });
+        }
+
+        // ---- Save ----
+        if (saveBtn) {
+            saveBtn.addEventListener("click", async () => {
+                renderPreview();
+                if (!validateClient()) { show(toastSaveErr); return; }
+
+                const specObj = JSON.parse(specPreview.textContent);
+                const payload = {
+                    spec: specObj,
+                    timeout_seconds: parsePositiveInt(timeoutEl),
+                    memory_limit_mb: parsePositiveInt(memoryEl),
+                    starter_code: starterEl ? starterEl.value : ""
+                };
+
+                try {
+                    const url = new URL("{% url 'function-save' %}", window.location.origin);
+                    if (currentQuestionId) url.searchParams.set("id", currentQuestionId);
+
+                    const res = await fetch(url.toString(), {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok && data.ok) {
+                        currentQuestionId = data.id;
+                        show(toastSaveOk);
+                    } else {
+                        show(toastSaveErr);
+                    }
+                } catch (e) { console.error(e); show(toastSaveErr); }
+            });
+        }
+
+        // ---- Initial state ----
+        // Start with one arg and one test as a helpful default
+        args = [{ name: "n", type: "integer" }];
+        tests = [{
+            name: "baseCase",
+            mode: "expected",
+            args: { n: 0 },
+            expected: 1,
+            exception: null
+        }];
+
+        renderArgs();
+        renderTests();
+        renderPreview();
+    })();
+</script>
+
+{% endblock %}
