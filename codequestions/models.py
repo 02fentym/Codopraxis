@@ -7,10 +7,6 @@ class CodeQuestion(models.Model):
     yaml_spec = models.TextField(
         help_text="The full problem definition in YAML format, including tests."
     )
-    
-    # We can still keep starter code as a separate field if we want to
-    # maintain it outside the YAML, for user-facing editing.
-    starter_code = models.TextField(blank=True, default="")
 
     timeout_seconds = models.PositiveIntegerField(
         default=2, help_text="Max seconds a student submission may run in Docker."

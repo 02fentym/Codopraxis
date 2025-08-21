@@ -60,20 +60,6 @@
                         </div>
                     </div>
 
-                    <!-- Starter Code (NOT part of JSON spec) -->
-                    <div class="form-control">
-                        <label class="label block">
-                            <span class="label-text font-medium">Starter code (optional)</span>
-                        </label>
-                        <textarea id="starter_code" class="textarea textarea-bordered bg-base-100 w-full h-24"
-                            placeholder="# e.g., skeleton code shown to students">{{ starter_default }}</textarea>
-                        <label class="label">
-                            <span class="opacity-60 text-xs">
-                                Prefilled in the student's editor. This is <strong>not</strong> stored in the JSON spec.
-                            </span>
-                        </label>
-                    </div>
-
                     <div class="divider my-0 w-auto text-lg font-bold mb-6">Tests</div>
 
                     <!-- Tests container (JS will render tests here) -->
@@ -149,7 +135,6 @@
   const descriptionEl = $("description");
   const timeoutEl = $("timeout_seconds");
   const memoryEl  = $("memory_limit_mb");
-  const starterEl = $("starter_code");
 
   const errTimeout = $("err_timeout");
   const errMemory  = $("err_memory");
@@ -207,7 +192,6 @@
     [timeoutEl, memoryEl].forEach(el => el && el.classList.remove("input-error"));
     if (errTimeout) { errTimeout.textContent = ""; errTimeout.classList.add("hidden"); }
     if (errMemory)  { errMemory.textContent  = ""; errMemory.classList.add("hidden"); }
-    if (starterEl)  { starterEl.classList.remove("textarea-error"); }
   }
 
   function showFieldError(section, field, message) {
@@ -336,7 +320,7 @@
   function buildSpec() {
     coerceStateFromDOM();
     const filtered = tests.filter(hasContent);
-    // Limits and starter_code are NOT included in the spec
+    // Limits NOT included in the spec
     return {
       version: 1,
       type: "standardIo",
@@ -423,10 +407,6 @@
       memoryEl.classList.add("input-error");
       if (errMemory) { errMemory.textContent = errors.memory_limit_mb; errMemory.classList.remove("hidden"); }
     }
-    if (errors.starter_code && starterEl) {
-      starterEl.classList.add("textarea-error");
-      // If you add a <p id="err_starter">, you can show the message there as well.
-    }
 
     Object.keys(errors || {}).forEach(key => {
       const match = key.match(/^tests\[(\d+)\]$/);
@@ -460,7 +440,6 @@
     if (descriptionEl) descriptionEl.addEventListener(evt, renderPreview);
     if (timeoutEl)     timeoutEl.addEventListener(evt, renderPreview);
     if (memoryEl)      memoryEl.addEventListener(evt, renderPreview);
-    // starterEl does not affect the preview JSON, so no render hook needed
   });
 
   testsContainer.addEventListener("click", function (e) {
@@ -572,7 +551,7 @@
     });
   }
 
-  // Save — sends WRAPPER { spec, timeout_seconds, memory_limit_mb, starter_code }
+  // Save — sends WRAPPER { spec, timeout_seconds, memory_limit_mb }
   if (saveBtn) {
     saveBtn.addEventListener("click", async () => {
       renderPreview();
@@ -586,8 +565,7 @@
       const payload = {
         spec: specObj,
         timeout_seconds: tVal,
-        memory_limit_mb: mVal,
-        starter_code: starterEl ? starterEl.value : ""
+        memory_limit_mb: mVal
       };
 
       try {
