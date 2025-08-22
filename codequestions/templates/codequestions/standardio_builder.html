@@ -29,7 +29,7 @@
                             </span>
                         </label>
                         <textarea id="description" name="description"
-                            class="textarea textarea-bordered bg-base-100 w-full h-24"
+                            class="textarea textarea-bordered bg-base-100 w-full h-20"
                             placeholder="Add two numbers together"></textarea>
                     </div>
 
@@ -67,7 +67,7 @@
 
                     <!-- Add Test -->
                     <div class="flex gap-2 justify-center">
-                        <button id="addTestBtn" type="button" class="btn btn-circle btn-outline btn-sm">+</button>
+                        <button id="addTestBtn" type="button" class="btn btn-primary btn-sm">+ Test</button>
                     </div>
                 </form>
             </div>
@@ -235,7 +235,7 @@
                 <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M11.25 4.25v-2.5h-9.5v9.5h2.5m.5-6.5v9.5h9.5v-9.5z"/>
               </svg>
             </button>
-            <button type="button" class="btn btn-ghost btn-sm text-error" data-action="removeTest"${tests.length === 1 ? ' disabled' : ''}>
+            <button type="button" class="btn btn-ghost btn-sm text-base-content" data-action="removeTest"${tests.length === 1 ? ' disabled' : ''}>
               <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
                     <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
               </svg>
@@ -261,7 +261,7 @@
           <label class="label block">
             <span class="label-text font-medium">stdin</span>
           </label>
-          <textarea id="${stdinId}" data-role="stdin" class="textarea textarea-bordered bg-base-100 w-full h-28"
+          <textarea id="${stdinId}" data-role="stdin" class="textarea textarea-bordered bg-base-100 w-full h-20"
                     placeholder="5&#10;4">${test.stdin ?? ""}</textarea>
           <p class="text-error text-xs mt-1 hidden" data-err="stdin"></p>
           <label class="label">

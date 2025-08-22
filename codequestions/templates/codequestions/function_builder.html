@@ -29,7 +29,7 @@
                                 <span class="opacity-60 text-xs">(shown to students)</span>
                             </span>
                         </label>
-                        <textarea id="description" class="textarea textarea-bordered bg-base-100 w-full h-24"
+                        <textarea id="description" class="textarea textarea-bordered bg-base-100 w-full h-20"
                             placeholder="Write a function factorial(n) that returns n! for n ≥ 0..."></textarea>
                     </div>
 
@@ -47,9 +47,9 @@
 
                         <div class="space-y-2">
                             <div id="argsContainer" class="space-y-3"></div>
-                            <div class="flex justify-center mt-2">
+                            <div class="flex justify-end mt-2">
                                 <button id="addArgBtn" type="button"
-                                    class="btn btn-circle btn-outline btn-sm">+</button>
+                                    class="btn btn-ghost btn-sm text-primary font-light">⊕ Add Argument</button>
                             </div>
                             <p class="text-error text-xs mt-1 hidden" id="err_args"></p>
                         </div>
@@ -87,7 +87,7 @@
                         <div class="divider my-0 w-auto text-lg font-bold mb-6">Tests</div>
                         <div id="testsContainer" class="space-y-6"></div>
                         <div class="flex justify-center mt-2">
-                            <button id="addTestBtn" type="button" class="btn btn-circle btn-outline btn-sm">+</button>
+                            <button id="addTestBtn" type="button" class="btn btn-primary btn-sm">+ Test</button>
                         </div>
                         <p class="text-error text-xs mt-1 hidden" id="err_tests"></p>
                     </div>
@@ -203,7 +203,7 @@
         <label class="label"><span class="label-text font-medium">Arg Type</span></label>
         <select class="select select-bordered w-full" data-role="arg-type">${options}</select>
       </div>
-      <button type="button" class="btn btn-ghost text-error mb-1"
+      <button type="button" class="btn btn-ghost text-base-content mb-1"
               data-action="remove-arg" ${args.length <= 1 ? 'disabled' : ''}>
         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
         <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
@@ -230,7 +230,7 @@
                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M11.25 4.25v-2.5h-9.5v9.5h2.5m.5-6.5v9.5h9.5v-9.5z"/>
                 </svg>
             </button>
-            <button type="button" class="btn btn-ghost btn-sm text-error" data-action="remove-test" ${tests.length <= 1 ? 'disabled' : ''}>
+            <button type="button" class="btn btn-ghost btn-sm text-base-content" data-action="remove-test" ${tests.length <= 1 ? 'disabled' : ''}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
                     <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
                 </svg>
