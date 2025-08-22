@@ -1,128 +1,119 @@
 # codequestions/admin.py
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
-from django.forms.models import BaseInlineFormSet
+from django.forms import ModelForm, HiddenInput, BaseInlineFormSet
+from django.utils.translation import gettext_lazy as _
 
-from .models import CodeQuestion, StandardIOQuestion, FunctionOOPQuestion
-
-
-# ---------- Inlines ----------
-
-class StandardIOInline(admin.StackedInline):
-    model = StandardIOQuestion
-    extra = 0
-    max_num = 1
-    can_delete = True
-    verbose_name_plural = "Standard I/O authoring"
-    fields = ("tests_json",)  # starter_code removed
+from .models import CodeQuestion, StructuralTest
 
 
-class FunctionOOPInlineFormSet(BaseInlineFormSet):
+# ---------- Forms ----------
+
+class CodeQuestionForm(ModelForm):
+    class Meta:
+        model = CodeQuestion
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        qt = self.instance.question_type if self.instance and self.instance.pk else self.data.get("question_type")
+        if qt == CodeQuestion.QuestionType.STRUCTURAL:
+            if "tests_json" in self.fields:
+                self.fields["tests_json"].required = False
+                self.fields["tests_json"].widget = HiddenInput()
+        else:
+            if "tests_json" in self.fields:
+                self.fields["tests_json"].help_text = _(
+                    "Provide test cases (list or object with test_cases). Required for Standard I/O."
+                )
+
+    def clean(self):
+        cleaned = super().clean()
+        try:
+            self.instance.question_type = cleaned.get("question_type") or self.instance.question_type
+            self.instance.tests_json = cleaned.get("tests_json")
+            self.instance.clean()
+        except ValidationError as e:
+            raise e
+        return cleaned
+
+
+class StructuralTestInlineFormSet(BaseInlineFormSet):
     """
-    Extra safety: if parent is standard_io, block rows here at the formset level.
-    (Model.clean also enforces this, but this gives earlier admin feedback.)
+    Validation:
+    - Only allowed when parent is structural
+    - No duplicate runtimes
+    - At least one inline when editing a structural question
     """
     def clean(self):
         super().clean()
         parent = getattr(self, "instance", None)
         if not parent or not parent.pk:
             return
-        if parent.question_type == CodeQuestion.QuestionType.STANDARD_IO and any(
-            form not in self.deleted_forms and not form.cleaned_data.get("DELETE", False)
-            for form in self.forms if hasattr(form, "cleaned_data")
-        ):
-            raise ValidationError(
-                "Function/OOP language specs are not allowed for a Standard I/O question."
-            )
+
+        if parent.question_type != CodeQuestion.QuestionType.STRUCTURAL:
+            raise ValidationError(_("Structural tests are only allowed on structural questions."))
+
+        seen = set()
+        kept = 0
+        for form in self.forms:
+            if form.cleaned_data.get("DELETE"):
+                continue
+
+            runtime = form.cleaned_data.get("runtime")
+            test_source = (form.cleaned_data.get("test_source") or "").strip()
+
+            if not runtime:
+                raise ValidationError(_("Each structural test must select a runtime."))
+            if not test_source:
+                raise ValidationError(_("Each structural test must include non-empty test source."))
+
+            if runtime.pk in seen:
+                raise ValidationError(_("Duplicate runtime detected. Each runtime may appear only once."))
+            seen.add(runtime.pk)
+            kept += 1
+
+        if kept == 0:
+            raise ValidationError(_("Provide at least one structural test."))
 
 
-class FunctionOOPInline(admin.TabularInline):
-    model = FunctionOOPQuestion
-    formset = FunctionOOPInlineFormSet
-    extra = 1
-    verbose_name_plural = "Function/OOP language specs"
-    fields = ("language", "test_framework", "entrypoint_hint", "starter_code")
-    show_change_link = True
+# ---------- Inlines ----------
+
+class StructuralTestInline(admin.StackedInline):
+    model = StructuralTest
+    formset = StructuralTestInlineFormSet
+    extra = 0
+    min_num = 0
+    fields = ("runtime", "test_source", "sha256")
+    readonly_fields = ("sha256",)
+    ordering = ("runtime__name",)
+    verbose_name_plural = "Per‑runtime structural tests"
 
 
-# ---------- Admins ----------
+# ---------- Admin ----------
 
 @admin.register(CodeQuestion)
 class CodeQuestionAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "question_type",
-        "topic",
-        "short_prompt",
-        "timeout_seconds",
-        "memory_limit_mb",
-        "is_active",
-        "created",
-        "updated",
-    )
-    list_filter = ("question_type", "topic", "is_active")
+    form = CodeQuestionForm
+
+    list_display = ("id", "question_type", "timeout_seconds", "memory_limit_mb", "created", "updated")
+    list_filter = ("question_type", "created")
     search_fields = ("prompt",)
     readonly_fields = ("created", "updated")
-    fieldsets = (
-        (None, {
-            "fields": (
-                "question_type",
-                "prompt",
-                "topic",
-            )
-        }),
-        ("Limits", {
-            "fields": ("timeout_seconds", "memory_limit_mb"),
-        }),
-        ("Flags", {
-            "fields": ("is_active",),
-        }),
-        ("Timestamps", {
-            "fields": ("created", "updated"),
-        }),
-    )
 
-    def short_prompt(self, obj):
-        return (obj.prompt or "")[:60]
-    short_prompt.short_description = "Prompt"
+    fieldsets = (
+        (None, {"fields": ("question_type", "prompt")}),
+        ("Execution limits", {"fields": ("timeout_seconds", "memory_limit_mb")}),
+        ("Standard I/O tests", {"fields": ("tests_json",), "description": "Only used for Standard I/O questions."}),
+        ("Timestamps", {"fields": ("created", "updated")}),
+    )
 
     def get_inline_instances(self, request, obj=None):
-        """
-        - On add (obj is None): no inlines yet (author picks type, saves once).
-        - On edit: show only the inlines that match the chosen question_type.
-        """
-        if obj is None:
-            return []
-        if obj.question_type == CodeQuestion.QuestionType.STANDARD_IO:
-            return [StandardIOInline(self.model, self.admin_site)]
-        else:
-            # function or oop
-            return [FunctionOOPInline(self.model, self.admin_site)]
+        if obj and obj.question_type == CodeQuestion.QuestionType.STRUCTURAL:
+            return [StructuralTestInline(self.model, self.admin_site)]
+        return []
 
-
-@admin.register(StandardIOQuestion)
-class StandardIOQuestionAdmin(admin.ModelAdmin):
-    """
-    Optional direct admin for power users.
-    Usually edited through the CodeQuestion inline.
-    """
-    list_display = ("code_question",)
-    search_fields = ("code_question__prompt",)
-
-
-@admin.register(FunctionOOPQuestion)
-class FunctionOOPQuestionAdmin(admin.ModelAdmin):
-    """
-    Optional direct admin for power users or when opening from the inline's 'change' link.
-    """
-    list_display = ("code_question", "language", "test_framework", "entrypoint_hint")
-    list_filter = ("language", "test_framework")
-    search_fields = ("code_question__prompt", "entrypoint_hint")
-    fieldsets = (
-        (None, {
-            "fields": ("code_question", "language", "test_framework")
-        }),
-        ("Authoring", {
-            "fields": ("entrypoint_hint", "starter_code", "test_code", "runner_meta")
-        }),
-    )
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if obj.question_type == CodeQuestion.QuestionType.STRUCTURAL and obj.structural_tests.count() == 0:
+            messages.info(request, "Structural question saved. Add at least one per‑runtime test below.")

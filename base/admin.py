@@ -1,11 +1,7 @@
 from django.contrib import admin
-from .models import Language, Course, Unit, Topic
+from .models import Course, Unit, Topic
 
 
-@admin.register(Language)
-class LanguageAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug")
-    search_fields = ("name", "slug")
 
 
 @admin.register(Course)
