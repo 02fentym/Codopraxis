@@ -3,241 +3,231 @@
 {% block content %}
 
 <div class="max-w-7xl mx-auto space-y-6">
-    <!-- Breadcrumbs -->
-    <div class="breadcrumbs text-sm">
-        <ul>
-            <li><a href="{% url 'home' %}" class="link">Home</a></li>
-            <li><span class="opacity-70">Code Questions</span></li>
-            <li class="font-semibold">Standard I/O Builder</li>
-        </ul>
+  <!-- Breadcrumbs -->
+  <div class="breadcrumbs text-sm">
+    <ul>
+      <li><a href="{% url 'home' %}" class="link">Home</a></li>
+      <li><span class="opacity-70">Code Questions</span></li>
+      <li class="font-semibold">Standard I/O Builder</li>
+    </ul>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Left: Builder Card -->
+    <div class="card bg-base-200">
+      <div class="card-body space-y-6">
+        <h1 class="card-title text-3xl">Standard I/O Builder</h1>
+
+        <form id="builder-form" method="post" class="space-y-6">
+          {% csrf_token %}
+
+          <!-- Hidden: force question_type -->
+          <input type="hidden" id="question_type" value="standard_io">
+
+          <!-- Prompt -->
+          <div class="form-control">
+            <label class="label block">
+              <span class="label-text font-medium">
+                Prompt <span class="opacity-60 text-xs">(shown to students)</span>
+              </span>
+            </label>
+            <textarea id="prompt" name="prompt" class="textarea textarea-bordered bg-base-100 w-full h-24"
+              placeholder="Add two numbers together"></textarea>
+            <p class="text-error text-xs mt-1 hidden" id="err_prompt"></p>
+          </div>
+
+          <!-- Limits -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="form-control">
+              <label class="label block">
+                <span class="label-text font-medium">Timeout (seconds)</span>
+              </label>
+              <input id="timeout_seconds" type="number" min="1" step="1" class="input input-bordered w-full"
+                value="{{ timeout_default }}">
+              <p class="text-error text-xs mt-1 hidden" id="err_timeout"></p>
+              <label class="label">
+                <span class="opacity-60 text-xs">Max time per test execution.</span>
+              </label>
+            </div>
+
+            <div class="form-control">
+              <label class="label block">
+                <span class="label-text font-medium">Memory limit (MB)</span>
+              </label>
+              <input id="memory_limit_mb" type="number" min="16" step="1" class="input input-bordered w-full"
+                value="{{ memory_default }}">
+              <p class="text-error text-xs mt-1 hidden" id="err_memory"></p>
+              <label class="label">
+                <span class="opacity-60 text-xs">Max memory per test execution.</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="divider my-0 w-auto text-lg font-bold mb-6">Tests</div>
+
+          <!-- Tests container (JS will render tests here) -->
+          <div id="testsContainer" class="space-y-6"></div>
+
+          <!-- Add Test -->
+          <div class="flex gap-2 justify-center">
+            <button id="addTestBtn" type="button" class="btn btn-primary btn-sm">+ Test</button>
+          </div>
+        </form>
+      </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Left: Builder Card -->
-        <div class="card bg-base-200">
-            <div class="card-body space-y-6">
-                <h1 class="card-title text-3xl">Standard I/O Builder</h1>
+    <!-- Right: Preview -->
+    <div class="card bg-base-200 lg:sticky lg:top-6 h-fit">
+      <div class="card-body space-y-3">
+        <h2 class="card-title text-2xl">Preview</h2>
 
-                <form id="builder-form" method="post" class="space-y-6">
-                    {% csrf_token %}
-
-                    <!-- Description -->
-                    <div class="form-control">
-                        <label class="label block">
-                            <span class="label-text font-medium">
-                                Description <span class="opacity-60 text-xs">(shown to students)</span>
-                            </span>
-                        </label>
-                        <textarea id="description" name="description"
-                            class="textarea textarea-bordered bg-base-100 w-full h-20"
-                            placeholder="Add two numbers together"></textarea>
-                    </div>
-
-                    <!-- Limits -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="form-control">
-                            <label class="label block">
-                                <span class="label-text font-medium">Timeout (seconds)</span>
-                            </label>
-                            <input id="timeout_seconds" type="number" min="1" step="1"
-                                class="input input-bordered w-full" value="{{ timeout_default }}">
-                            <p class="text-error text-xs mt-1 hidden" id="err_timeout"></p>
-                            <label class="label">
-                                <span class="opacity-60 text-xs">Max time per test execution.</span>
-                            </label>
-                        </div>
-
-                        <div class="form-control">
-                            <label class="label block">
-                                <span class="label-text font-medium">Memory limit (MB)</span>
-                            </label>
-                            <input id="memory_limit_mb" type="number" min="16" step="1"
-                                class="input input-bordered w-full" value="{{ memory_default }}">
-                            <p class="text-error text-xs mt-1 hidden" id="err_memory"></p>
-                            <label class="label">
-                                <span class="opacity-60 text-xs">Max memory per test execution.</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="divider my-0 w-auto text-lg font-bold mb-6">Tests</div>
-
-                    <!-- Tests container (JS will render tests here) -->
-                    <div id="testsContainer" class="space-y-6"></div>
-
-                    <!-- Add Test -->
-                    <div class="flex gap-2 justify-center">
-                        <button id="addTestBtn" type="button" class="btn btn-primary btn-sm">+ Test</button>
-                    </div>
-                </form>
+        <!-- What will be saved -->
+        <div class="collapse collapse-arrow bg-base-100">
+          <input type="checkbox" checked>
+          <div class="collapse-title font-semibold">Question payload</div>
+          <div class="collapse-content">
+            <div class="mockup-code text-xs bg-base-100">
+              <pre><code id="questionPreview">{}</code></pre>
             </div>
+          </div>
         </div>
 
-        <!-- Right: Compiled Spec (Preview) -->
-        <div class="card bg-base-200 lg:sticky lg:top-6 h-fit">
-            <div class="card-body">
-                <h2 class="card-title text-2xl mb-2">Compiled Spec (Preview)</h2>
-
-                <div class="mockup-code text-xs bg-base-100">
-                    <pre><code id="specPreview">{
-          "version": 1,
-          "type": "standardIo",
-          "description": "",
-          "tests": []
-        }</code></pre>
-                </div>
-
-                <!-- Copy and Validate JSON button -->
-                <div class="mt-2 flex items-center gap-2">
-                    <button id="copyJsonBtn" type="button" class="btn btn-outline btn-sm">Copy JSON</button>
-                    <button id="validateBtn" type="button" class="btn btn-primary btn-sm">Validate JSON</button>
-                    <button id="saveBtn" type="button" class="btn btn-success btn-sm">Save</button>
-                    <span id="newlineBadge" class="badge badge-outline hidden">some stdout will include \n</span>
-                </div>
-
-                <!-- Toasts -->
-                <div id="toastSaveOk" class="toast toast-end z-50 hidden">
-                    <div class="alert alert-success"><span>Saved.</span></div>
-                </div>
-                <div id="toastSaveErr" class="toast toast-end z-50 hidden">
-                    <div class="alert alert-error"><span>Save failed. Fix errors and try again.</span></div>
-                </div>
-                <div id="toastOk" class="toast toast-end z-50 hidden">
-                    <div class="alert alert-success"><span>Spec is valid.</span></div>
-                </div>
-                <div id="toastErr" class="toast toast-end z-50 hidden">
-                    <div class="alert alert-error"><span>Spec has issues. See console.</span></div>
-                </div>
-
-
-                <!-- DaisyUI toast -->
-                <div id="toast" class="toast toast-end z-50 hidden">
-                    <div class="alert alert-success">
-                        <span>Copied to clipboard.</span>
-                    </div>
-                </div>
-
-
-                <div class="mt-2">
-                    <span id="newlineBadge" class="badge badge-outline hidden">some stdout will include \n</span>
-                </div>
+        <div class="collapse collapse-arrow bg-base-100">
+          <input type="checkbox">
+          <div class="collapse-title font-semibold">Standard I/O tests_json</div>
+          <div class="collapse-content">
+            <div class="mockup-code text-xs bg-base-100">
+              <pre><code id="testsPreview">{"tests":[{"name":"test1","stdin":"","stdout":""}]}</code></pre>
             </div>
+          </div>
         </div>
+
+        <!-- Actions -->
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <button id="copyJsonBtn" type="button" class="btn btn-outline btn-sm">Copy tests JSON</button>
+          <button id="validateBtn" type="button" class="btn btn-primary btn-sm">Validate tests</button>
+          <button id="saveBtn" type="button" class="btn btn-success btn-sm">Save</button>
+          <span id="newlineBadge" class="badge badge-outline hidden">some stdout will include \n</span>
+        </div>
+
+        <!-- Toasts -->
+        <div id="toastSaveOk" class="toast toast-end z-50 hidden">
+          <div class="alert alert-success"><span>Saved.</span></div>
+        </div>
+        <div id="toastSaveErr" class="toast toast-end z-50 hidden">
+          <div class="alert alert-error"><span>Save failed. Fix errors and try again.</span></div>
+        </div>
+        <div id="toastOk" class="toast toast-end z-50 hidden">
+          <div class="alert alert-success"><span>Tests are valid.</span></div>
+        </div>
+        <div id="toastErr" class="toast toast-end z-50 hidden">
+          <div class="alert alert-error"><span>Tests have issues. See console.</span></div>
+        </div>
+        <div id="toast" class="toast toast-end z-50 hidden">
+          <div class="alert alert-success"><span>Copied to clipboard.</span></div>
+        </div>
+      </div>
     </div>
+  </div>
 </div>
 
-
 <script>
-(function () {
-  const $ = (id) => document.getElementById(id);
+  (function () {
+    const $ = (id) => document.getElementById(id);
 
-  // ----- DOM refs -----
-  const descriptionEl = $("description");
-  const timeoutEl = $("timeout_seconds");
-  const memoryEl  = $("memory_limit_mb");
+    // ----- DOM refs -----
+    const promptEl = $("prompt");
+    const timeoutEl = $("timeout_seconds");
+    const memoryEl = $("memory_limit_mb");
 
-  const errTimeout = $("err_timeout");
-  const errMemory  = $("err_memory");
+    const errPrompt = $("err_prompt");
+    const errTimeout = $("err_timeout");
+    const errMemory = $("err_memory");
 
-  const testsContainer = $("testsContainer");
-  const previewEl = $("specPreview");
-  const newlineBadge = $("newlineBadge");
-  const addTestBtn = $("addTestBtn");
+    const testsContainer = $("testsContainer");
+    const questionPreview = $("questionPreview");
+    const testsPreview = $("testsPreview");
+    const newlineBadge = $("newlineBadge");
 
-  const copyBtn  = document.getElementById("copyJsonBtn");
-  const toastEl  = document.getElementById("toast");     // copy toast (optional)
-  const validateBtn = document.getElementById("validateBtn");
-  const toastOk  = document.getElementById("toastOk");
-  const toastErr = document.getElementById("toastErr");
-  const saveBtn = document.getElementById("saveBtn");
-  const toastSaveOk  = document.getElementById("toastSaveOk");
-  const toastSaveErr = document.getElementById("toastSaveErr");
+    const addTestBtn = $("addTestBtn");
+    const copyBtn = $("copyJsonBtn");
+    const toastEl = $("toast");
+    const validateBtn = $("validateBtn");
+    const toastOk = $("toastOk");
+    const toastErr = $("toastErr");
+    const saveBtn = $("saveBtn");
+    const toastSaveOk = $("toastSaveOk");
+    const toastSaveErr = $("toastSaveErr");
 
-  // ----- State -----
-  let tests = [
-    { name: "test1", stdin: "", stdout: "" }
-  ];
-  let currentQuestionId = null; // set after first successful save
+    // ----- State -----
+    let tests = [{ name: "test1", stdin: "", stdout: "" }];
+    let currentQuestionId = null; // set after first successful save
 
-  // ----- Utilities -----
-  function show(el, ms = 1800) {
-    if (!el) return;
-    el.classList.remove("hidden");
-    setTimeout(() => el.classList.add("hidden"), ms);
-  }
+    // ----- Utilities -----
+    function show(el, ms = 1800) {
+      if (!el) return;
+      el.classList.remove("hidden");
+      setTimeout(() => el.classList.add("hidden"), ms);
+    }
+    function getCookie(name) {
+      const v = document.cookie.split("; ").find(row => row.startsWith(name + "="));
+      return v ? decodeURIComponent(v.split("=")[1]) : null;
+    }
+    const csrftoken = getCookie("csrftoken");
+    function sectionNodes() { return [...testsContainer.querySelectorAll("[data-test-index]")]; }
 
-  function getCookie(name) {
-    const v = document.cookie.split("; ").find(row => row.startsWith(name + "="));
-    return v ? decodeURIComponent(v.split("=")[1]) : null;
-  }
-  const csrftoken = getCookie("csrftoken");
+    function clearInlineErrors(section) {
+      const nameEl = section.querySelector('[data-role="name"]');
+      const stdinEl = section.querySelector('[data-role="stdin"]');
+      const stdoutEl = section.querySelector('[data-role="stdout"]');
+      const errName = section.querySelector('[data-err="name"]');
+      const errStdout = section.querySelector('[data-err="stdout"]');
+      [nameEl, stdinEl, stdoutEl].forEach(el => el && el.classList.remove("input-error", "textarea-error"));
+      [errName, errStdout].forEach(el => { if (el) { el.textContent = ""; el.classList.add("hidden"); } });
+    }
+    function clearGlobalErrors() {
+      [promptEl, timeoutEl, memoryEl].forEach(el => el && el.classList.remove("input-error", "select-error"));
+      [errPrompt, errTimeout, errMemory].forEach(el => { if (el) { el.textContent = ""; el.classList.add("hidden"); } });
+    }
+    function showFieldError(section, field, message) {
+      const map = {
+        name: { sel: '[data-role="name"]', errSel: '[data-err="name"]', errorClass: 'input-error' },
+        stdout: { sel: '[data-role="stdout"]', errSel: '[data-err="stdout"]', errorClass: 'input-error' },
+      };
+      const cfg = map[field]; if (!cfg) return;
+      const input = section.querySelector(cfg.sel);
+      const err = section.querySelector(cfg.errSel);
+      if (input) input.classList.add(cfg.errorClass);
+      if (err) { err.textContent = message; err.classList.remove("hidden"); }
+    }
+    function makeUniqueName(base) {
+      const existing = new Set(tests.map(t => (t.name || "").trim()).filter(Boolean));
+      let candidate = (base || "test").trim();
+      if (!existing.has(candidate)) return candidate;
+      let i = 1;
+      while (existing.has(`${candidate}-copy${i > 1 ? "-" + i : ""}`)) i++;
+      return `${candidate}-copy${i > 1 ? "-" + i : ""}`;
+    }
 
-  function sectionNodes() {
-    return [...testsContainer.querySelectorAll("[data-test-index]")];
-  }
-
-  function clearInlineErrors(section) {
-    const nameEl   = section.querySelector('[data-role="name"]');
-    const stdinEl  = section.querySelector('[data-role="stdin"]');
-    const stdoutEl = section.querySelector('[data-role="stdout"]');
-    const errName  = section.querySelector('[data-err="name"]');
-    const errStdin = section.querySelector('[data-err="stdin"]');
-    const errStdout= section.querySelector('[data-err="stdout"]');
-
-    [nameEl, stdinEl, stdoutEl].forEach(el => el && el.classList.remove("input-error","textarea-error"));
-    [errName, errStdin, errStdout].forEach(el => { if (el){ el.textContent = ""; el.classList.add("hidden"); }});
-  }
-
-  function clearGlobalErrors() {
-    [timeoutEl, memoryEl].forEach(el => el && el.classList.remove("input-error"));
-    if (errTimeout) { errTimeout.textContent = ""; errTimeout.classList.add("hidden"); }
-    if (errMemory)  { errMemory.textContent  = ""; errMemory.classList.add("hidden"); }
-  }
-
-  function showFieldError(section, field, message) {
-    const map = {
-      name:   { inputSel: '[data-role="name"]',   errSel: '[data-err="name"]',   errorClass: 'input-error'   },
-      stdin:  { inputSel: '[data-role="stdin"]',  errSel: '[data-err="stdin"]',  errorClass: 'textarea-error'},
-      stdout: { inputSel: '[data-role="stdout"]', errSel: '[data-err="stdout"]', errorClass: 'input-error'   },
-    };
-    const cfg = map[field];
-    if (!cfg) return;
-    const input = section.querySelector(cfg.inputSel);
-    const err   = section.querySelector(cfg.errSel);
-    if (input) input.classList.add(cfg.errorClass);
-    if (err) { err.textContent = message; err.classList.remove("hidden"); }
-  }
-
-  // Unique name helper for duplication
-  function makeUniqueName(base) {
-    const existing = new Set(tests.map(t => (t.name || "").trim()).filter(Boolean));
-    let candidate = (base || "test").trim();
-    if (!existing.has(candidate)) return candidate;
-    let i = 1;
-    while (existing.has(`${candidate}-copy${i > 1 ? "-" + i : ""}`)) i++;
-    return `${candidate}-copy${i > 1 ? "-" + i : ""}`;
-  }
-
-  // ----- Renderers -----
-  function testSectionTemplate(idx, test) {
-    const n = idx + 1;
-    const stdinId  = `stdin_${n}`;
-    const stdoutId = `stdout_${n}`;
-    const nameId   = `name_${n}`;
-
-    return `
+    // ----- Renderers -----
+    function testSectionTemplate(idx, test) {
+      const n = idx + 1;
+      const stdinId = `stdin_${n}`;
+      const stdoutId = `stdout_${n}`;
+      const nameId = `name_${n}`;
+      return `
       <div class="space-y-3 border border-2 border-base-100 rounded-box px-4" data-test-index="${idx}">
         <div class="flex items-center justify-between my-2">
           <div class="my-0 w-auto font-medium text-lg">Test #${n}</div>
           <div class="flex items-center gap-1">
-            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicateTest">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicateTest" title="Duplicate">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
                 <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M11.25 4.25v-2.5h-9.5v9.5h2.5m.5-6.5v9.5h9.5v-9.5z"/>
               </svg>
             </button>
-            <button type="button" class="btn btn-ghost btn-sm text-base-content" data-action="removeTest"${tests.length === 1 ? ' disabled' : ''}>
+            <button type="button" class="btn btn-ghost btn-sm text-base-content" data-action="removeTest"${tests.length === 1 ? ' disabled' : ''} title="Remove">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1">
-                    <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+                <path d="M4 7h16m-10 4v6m4-6v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
               </svg>
             </button>
           </div>
@@ -263,9 +253,8 @@
           </label>
           <textarea id="${stdinId}" data-role="stdin" class="textarea textarea-bordered bg-base-100 w-full h-20"
                     placeholder="5&#10;4">${test.stdin ?? ""}</textarea>
-          <p class="text-error text-xs mt-1 hidden" data-err="stdin"></p>
           <label class="label">
-            <span class="opacity-60 text-xs">Multiline OK. Piped to the program’s stdin.</span>
+            <span class="opacity-60 text-xs">Multiline OK. Piped to stdin.</span>
           </label>
         </div>
 
@@ -283,332 +272,231 @@
         </div>
       </div>
     `;
-  }
+    }
+    function renderTests() { testsContainer.innerHTML = tests.map((t, i) => testSectionTemplate(i, t)).join(""); }
 
-  function renderTests() {
-    testsContainer.innerHTML = tests.map((t, i) => testSectionTemplate(i, t)).join("");
-  }
-
-  // ----- State coercion & spec -----
-  function coerceStateFromDOM() {
-    const sections = sectionNodes();
-    tests = sections.map((section, i) => {
-      const nameEl   = section.querySelector('[data-role="name"]');
-      const stdinEl  = section.querySelector('[data-role="stdin"]');
-      const stdoutEl = section.querySelector('[data-role="stdout"]');
-
-      const rawStdout = (stdoutEl.value || "");
-      const stdout = rawStdout ? (rawStdout.endsWith("\n") ? rawStdout : rawStdout + "\n") : "";
+    // ----- Spec builders -----
+    function coerceStateFromDOM() {
+      const sections = sectionNodes();
+      tests = sections.map((section, i) => {
+        const nameEl = section.querySelector('[data-role="name"]');
+        const stdinEl = section.querySelector('[data-role="stdin"]');
+        const stdoutEl = section.querySelector('[data-role="stdout"]');
+        const rawStdout = (stdoutEl.value || "");
+        const stdout = rawStdout ? (rawStdout.endsWith("\n") ? rawStdout : rawStdout + "\n") : "";
+        return {
+          name: (nameEl.value || `test${i + 1}`).trim(),
+          stdin: stdinEl.value || "",
+          stdout: stdout
+        };
+      });
+    }
+    function hasContent(t) { return (t.stdin && t.stdin.length) || (t.stdout && t.stdout.length); }
+    function parsePositiveInt(el) {
+      const v = (el?.value ?? "").trim();
+      const n = Number(v);
+      return Number.isInteger(n) && n > 0 ? n : null;
+    }
+    function buildTestsJson() {
+      coerceStateFromDOM();
+      const filtered = tests.filter(hasContent);
+      return { tests: filtered };
+    }
+    function buildQuestionPayload() {
       return {
-        name: (nameEl.value || `test${i+1}`).trim(),
-        stdin: stdinEl.value || "",
-        stdout: stdout
-      };
-    });
-  }
-
-  function hasContent(t) {
-    return (t.stdin && t.stdin.length) || (t.stdout && t.stdout.length);
-  }
-
-  function parsePositiveInt(el) {
-    const v = (el?.value ?? "").trim();
-    const n = Number(v);
-    return Number.isInteger(n) && n > 0 ? n : null;
-  }
-
-  function buildSpec() {
-    coerceStateFromDOM();
-    const filtered = tests.filter(hasContent);
-    // Limits NOT included in the spec
-    return {
-      version: 1,
-      type: "standardIo",
-      description: descriptionEl.value || "",
-      tests: filtered
-    };
-  }
-
-  // ----- Client-side validation -----
-  function validateClient() {
-    const sections = sectionNodes();
-    let anyNeedsNewline = false;
-    let isValid = true;
-
-    // Global numeric validations (not in JSON, but required to save)
-    clearGlobalErrors();
-    const tVal = parsePositiveInt(timeoutEl);
-    const mVal = parsePositiveInt(memoryEl);
-    if (tVal === null) {
-      isValid = false;
-      if (timeoutEl) timeoutEl.classList.add("input-error");
-      if (errTimeout) { errTimeout.textContent = "Enter a positive integer."; errTimeout.classList.remove("hidden"); }
-    }
-    if (mVal === null) {
-      isValid = false;
-      if (memoryEl) memoryEl.classList.add("input-error");
-      if (errMemory)  { errMemory.textContent = "Enter a positive integer."; errMemory.classList.remove("hidden"); }
-    }
-
-    // Count names for uniqueness
-    const nameCounts = {};
-    sections.forEach((section) => {
-      const nameEl = section.querySelector('[data-role="name"]');
-      const name = (nameEl.value || "").trim();
-      if (name) nameCounts[name] = (nameCounts[name] || 0) + 1;
-    });
-
-    sections.forEach((section) => {
-      clearInlineErrors(section);
-
-      const nameEl   = section.querySelector('[data-role="name"]');
-      const stdinEl  = section.querySelector('[data-role="stdin"]');
-      const stdoutEl = section.querySelector('[data-role="stdout"]');
-
-      const name = (nameEl.value || "").trim();
-      const rawStdout = (stdoutEl.value || "");
-      const contentPresent = (stdinEl.value && stdinEl.value.length) || rawStdout.length;
-
-      // Name required & unique
-      if (!name) {
-        isValid = false;
-        showFieldError(section, "name", "Test name is required.");
-      } else if (nameCounts[name] > 1) {
-        isValid = false;
-        showFieldError(section, "name", "Test name must be unique.");
-      }
-
-      // stdout required if there is any content
-      if (contentPresent && rawStdout.trim().length === 0) {
-        isValid = false;
-        showFieldError(section, "stdout", "stdout is required when a test has input/output.");
-      }
-
-      if (rawStdout && !rawStdout.endsWith("\n")) {
-        anyNeedsNewline = true;
-      }
-    });
-
-    newlineBadge.classList.toggle("hidden", !anyNeedsNewline);
-    return isValid;
-  }
-
-  // ----- Server-side errors -> inline surfacing -----
-  function applyServerErrors(errors) {
-    // Clear prior
-    sectionNodes().forEach(clearInlineErrors);
-    clearGlobalErrors();
-
-    if (errors.timeout_seconds && timeoutEl) {
-      timeoutEl.classList.add("input-error");
-      if (errTimeout) { errTimeout.textContent = errors.timeout_seconds; errTimeout.classList.remove("hidden"); }
-    }
-    if (errors.memory_limit_mb && memoryEl) {
-      memoryEl.classList.add("input-error");
-      if (errMemory) { errMemory.textContent = errors.memory_limit_mb; errMemory.classList.remove("hidden"); }
-    }
-
-    Object.keys(errors || {}).forEach(key => {
-      const match = key.match(/^tests\[(\d+)\]$/);
-      if (!match) return;
-      const idx = parseInt(match[1], 10);
-      const section = sectionNodes()[idx];
-      if (!section) return;
-
-      const tErr = errors[key];
-      if (tErr && typeof tErr === "object") {
-        if (tErr.name)   showFieldError(section, "name",   tErr.name);
-        if (tErr.stdin)  showFieldError(section, "stdin",  tErr.stdin);
-        if (tErr.stdout) showFieldError(section, "stdout", tErr.stdout);
-      }
-    });
-
-    const firstErr = document.querySelector(".text-error:not(.hidden)");
-    if (firstErr) firstErr.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-
-  // ----- Preview render -----
-  function renderPreview() {
-    validateClient(); // inline client errors
-    previewEl.textContent = JSON.stringify(buildSpec(), null, 2);
-  }
-
-  // ----- Events -----
-  testsContainer.addEventListener("input", renderPreview);
-  testsContainer.addEventListener("change", renderPreview);
-  ["input","change"].forEach(evt => {
-    if (descriptionEl) descriptionEl.addEventListener(evt, renderPreview);
-    if (timeoutEl)     timeoutEl.addEventListener(evt, renderPreview);
-    if (memoryEl)      memoryEl.addEventListener(evt, renderPreview);
-  });
-
-  testsContainer.addEventListener("click", function (e) {
-    const section = e.target.closest("[data-test-index]");
-    if (!section) return;
-    const idx = parseInt(section.dataset.testIndex, 10);
-
-    // Remove
-    const removeBtn = e.target.closest("[data-action='removeTest']");
-    if (removeBtn) {
-      if (tests.length <= 1) return;
-      tests.splice(idx, 1);
-      tests = tests.map((t, i) => ({
-        ...t,
-        name: t.name && /^test\d+$/.test(t.name) ? `test${i+1}` : t.name
-      }));
-      renderTests();
-      renderPreview();
-      return;
-    }
-
-    // Duplicate
-    const dupBtn = e.target.closest("[data-action='duplicateTest']");
-    if (dupBtn) {
-      const nameEl   = section.querySelector('[data-role="name"]');
-      const stdinEl  = section.querySelector('[data-role="stdin"]');
-      const stdoutEl = section.querySelector('[data-role="stdout"]');
-
-      const baseName = (nameEl.value || `test${idx+1}`).trim();
-      const newName  = makeUniqueName(baseName || `test${idx+1}`);
-
-      const newTest = {
-        name: newName,
-        stdin: stdinEl.value || "",
-        stdout: (stdoutEl.value || "")
-      };
-
-      tests.splice(idx + 1, 0, newTest);
-      renderTests();
-      renderPreview();
-
-      const newSection = sectionNodes()[idx + 1];
-      const newNameInput = newSection?.querySelector('[data-role="name"]');
-      if (newNameInput) newNameInput.focus();
-    }
-  });
-
-  if (addTestBtn) {
-    addTestBtn.addEventListener("click", function () {
-      const next = tests.length + 1;
-      tests.push({ name: `test${next}`, stdin: "", stdout: "" });
-      renderTests();
-      renderPreview();
-    });
-  }
-
-  // Copy JSON
-  if (copyBtn) {
-    copyBtn.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(previewEl.textContent);
-        show(toastEl);
-      } catch (e) {
-        const tmp = document.createElement("textarea");
-        tmp.value = previewEl.textContent;
-        document.body.appendChild(tmp);
-        tmp.select();
-        document.execCommand("copy");
-        document.body.removeChild(tmp);
-        show(toastEl);
-      }
-    });
-  }
-
-  // Validate JSON (server) — sends SPEC ONLY
-  if (validateBtn) {
-    validateBtn.addEventListener("click", async () => {
-      renderPreview();
-      sectionNodes().forEach(clearInlineErrors);
-      clearGlobalErrors();
-
-      const specText = previewEl.textContent;
-      try {
-        const res = await fetch("{% url 'standardio-validate' %}", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrftoken
-          },
-          body: specText
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          if (data && data.errors) applyServerErrors(data.errors);
-          show(toastErr);
-          return;
+        question_type: "standard_io",
+        prompt: (promptEl.value || "").trim(),
+        timeout_seconds: parsePositiveInt(timeoutEl),
+        memory_limit_mb: parsePositiveInt(memoryEl),
+        standard_io: {
+          tests_json: buildTestsJson()
         }
-        const data = await res.json();
-        if (data.ok) {
-          show(toastOk);
-        } else {
-          applyServerErrors(data.errors || {});
-          show(toastErr);
-        }
-      } catch (e) {
-        console.error(e);
-        show(toastErr);
+      };
+    }
+
+    // ----- Validation -----
+    function validateClient() {
+      let ok = true; clearGlobalErrors();
+      if (!promptEl.value.trim()) {
+        ok = false; promptEl.classList.add("textarea-error");
+        errPrompt.textContent = "Prompt is required."; errPrompt.classList.remove("hidden");
       }
-    });
-  }
-
-  // Save — sends WRAPPER { spec, timeout_seconds, memory_limit_mb }
-  if (saveBtn) {
-    saveBtn.addEventListener("click", async () => {
-      renderPreview();
-      sectionNodes().forEach(clearInlineErrors);
-      clearGlobalErrors();
-
-      const specObj = JSON.parse(previewEl.textContent);
       const tVal = parsePositiveInt(timeoutEl);
       const mVal = parsePositiveInt(memoryEl);
+      if (tVal === null) { ok = false; timeoutEl.classList.add("input-error"); errTimeout.textContent = "Enter a positive integer."; errTimeout.classList.remove("hidden"); }
+      if (mVal === null) { ok = false; memoryEl.classList.add("input-error"); errMemory.textContent = "Enter a positive integer."; errMemory.classList.remove("hidden"); }
 
-      const payload = {
-        spec: specObj,
-        timeout_seconds: tVal,
-        memory_limit_mb: mVal
-      };
+      // tests validation
+      const sections = sectionNodes();
+      const nameCounts = {};
+      sections.forEach((section) => {
+        const nameEl = section.querySelector('[data-role="name"]');
+        const name = (nameEl.value || "").trim();
+        if (name) nameCounts[name] = (nameCounts[name] || 0) + 1;
+      });
 
-      try {
-        const url = new URL("{% url 'standardio-save' %}", window.location.origin);
-        if (currentQuestionId) url.searchParams.set("id", currentQuestionId);
+      let anyNeedsNewline = false;
+      sections.forEach((section) => {
+        clearInlineErrors(section);
+        const nameEl = section.querySelector('[data-role="name"]');
+        const stdoutEl = section.querySelector('[data-role="stdout"]');
+        const name = (nameEl.value || "").trim();
+        const rawStdout = (stdoutEl.value || "");
+        const contentPresent = true; // tests are meaningful rows; enforce name+stdout
+        if (!name) { ok = false; showFieldError(section, "name", "Test name is required."); }
+        else if (nameCounts[name] > 1) { ok = false; showFieldError(section, "name", "Test name must be unique."); }
+        if (contentPresent && rawStdout.trim().length === 0) { ok = false; showFieldError(section, "stdout", "stdout is required."); }
+        if (rawStdout && !rawStdout.endsWith("\n")) anyNeedsNewline = true;
+      });
+      newlineBadge.classList.toggle("hidden", !anyNeedsNewline);
+      return ok;
+    }
 
-        const res = await fetch(url.toString(), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrftoken
-          },
-          body: JSON.stringify(payload)
-        });
+    function applyServerErrors(errors) {
+      clearGlobalErrors();
+      if (!errors) return;
+      if (errors.prompt) { promptEl.classList.add("textarea-error"); errPrompt.textContent = errors.prompt; errPrompt.classList.remove("hidden"); }
+      if (errors.timeout_seconds) { timeoutEl.classList.add("input-error"); errTimeout.textContent = errors.timeout_seconds; errTimeout.classList.remove("hidden"); }
+      if (errors.memory_limit_mb) { memoryEl.classList.add("input-error"); errMemory.textContent = errors.memory_limit_mb; errMemory.classList.remove("hidden"); }
 
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          if (data && data.errors) applyServerErrors(data.errors);
-          show(toastSaveErr);
-          return;
-        }
+      // tests errors: expect keys like tests[i].field
+      sectionNodes().forEach(clearInlineErrors);
+      Object.keys(errors || {}).forEach(k => {
+        const m = k.match(/^tests\[(\d+)\]\.(name|stdout)$/);
+        if (!m) return;
+        const idx = Number(m[1]); const field = m[2];
+        const section = sectionNodes()[idx]; if (!section) return;
+        showFieldError(section, field, errors[k]);
+      });
+    }
 
-        const data = await res.json();
-        if (data.ok) {
-          currentQuestionId = data.id;
-          show(toastSaveOk);
-        } else {
-          if (data.errors) applyServerErrors(data.errors);
-          show(toastSaveErr);
-        }
-      } catch (e) {
-        console.error(e);
-        show(toastSaveErr);
+    // ----- Preview -----
+    function renderPreview() {
+      const testsJson = buildTestsJson();
+      const qPayload = buildQuestionPayload();
+      testsPreview.textContent = JSON.stringify(testsJson, null, 2);
+      questionPreview.textContent = JSON.stringify(qPayload, null, 2);
+    }
+
+    // ----- Events -----
+    testsContainer.addEventListener("input", renderPreview);
+    testsContainer.addEventListener("change", renderPreview);
+    ["input", "change"].forEach(evt => {
+      [promptEl, timeoutEl, memoryEl].forEach(el => el && el.addEventListener(evt, renderPreview));
+    });
+
+    testsContainer.addEventListener("click", function (e) {
+      const section = e.target.closest("[data-test-index]");
+      if (!section) return;
+      const idx = parseInt(section.dataset.testIndex, 10);
+
+      // Remove
+      const removeBtn = e.target.closest("[data-action='removeTest']");
+      if (removeBtn) {
+        if (tests.length <= 1) return;
+        tests.splice(idx, 1);
+        tests = tests.map((t, i) => ({
+          ...t,
+          name: t.name && /^test\d+$/.test(t.name) ? `test${i + 1}` : t.name
+        }));
+        renderTests();
+        renderPreview();
+        return;
+      }
+
+      // Duplicate
+      const dupBtn = e.target.closest("[data-action='duplicateTest']");
+      if (dupBtn) {
+        const nameEl = section.querySelector('[data-role="name"]');
+        const stdinEl = section.querySelector('[data-role="stdin"]');
+        const stdoutEl = section.querySelector('[data-role="stdout"]');
+        const baseName = (nameEl.value || `test${idx + 1}`).trim();
+        const newName = makeUniqueName(baseName || `test${idx + 1}`);
+        const newTest = { name: newName, stdin: stdinEl.value || "", stdout: (stdoutEl.value || "") };
+        tests.splice(idx + 1, 0, newTest);
+        renderTests(); renderPreview();
+        const newSection = sectionNodes()[idx + 1];
+        const newNameInput = newSection?.querySelector('[data-role="name"]');
+        if (newNameInput) newNameInput.focus();
       }
     });
-  }
 
-  // ----- Initial render -----
-  renderTests();
-  renderPreview();
-})();
+    if (addTestBtn) {
+      addTestBtn.addEventListener("click", function () {
+        const next = tests.length + 1;
+        tests.push({ name: `test${next}`, stdin: "", stdout: "" });
+        renderTests(); renderPreview();
+      });
+    }
+
+    // Copy tests JSON
+    if (copyBtn) {
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(testsPreview.textContent);
+          show(toastEl);
+        } catch {
+          const tmp = document.createElement("textarea");
+          tmp.value = testsPreview.textContent;
+          document.body.appendChild(tmp);
+          tmp.select();
+          document.execCommand("copy");
+          document.body.removeChild(tmp);
+          show(toastEl);
+        }
+      });
+    }
+
+    // Validate tests (server): send ONLY tests_json
+    if (validateBtn) {
+      validateBtn.addEventListener("click", async () => {
+        renderPreview();
+        if (!validateClient()) { show(toastErr); return; }
+        try {
+          const res = await fetch("{% url 'standardio-validate' %}", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+            body: testsPreview.textContent
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && (data.ok || data.valid)) { show(toastOk); }
+          else { applyServerErrors(data.errors || {}); show(toastErr); }
+        } catch (e) {
+          console.error(e); show(toastErr);
+        }
+      });
+    }
+
+    // Save — send FULL authoring payload
+    if (saveBtn) {
+      saveBtn.addEventListener("click", async () => {
+        renderPreview();
+        if (!validateClient()) { show(toastSaveErr); return; }
+
+        const payload = buildQuestionPayload();
+        if (currentQuestionId) payload.id = currentQuestionId;
+
+        try {
+          const url = new URL("{% url 'standardio-save' %}", window.location.origin);
+          const res = await fetch(url.toString(), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.ok) { currentQuestionId = data.id; show(toastSaveOk); }
+          else { applyServerErrors(data.errors || {}); show(toastSaveErr); }
+        } catch (e) {
+          console.error(e); show(toastSaveErr);
+        }
+      });
+    }
+
+    // Initial render
+    function renderTestsAndPreview() { renderTests(); renderPreview(); }
+    renderTestsAndPreview();
+  })();
 </script>
-
 
 
 {% endblock %}

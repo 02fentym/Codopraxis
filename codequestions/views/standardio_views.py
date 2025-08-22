@@ -1,156 +1,189 @@
+# codequestions/views/standardio_views.py
 import json
-from django.http import JsonResponse, HttpResponseBadRequest
+from typing import Dict, Any, List
+from django.db import transaction
+from django.http import JsonResponse, HttpRequest
+from django.shortcuts import render
 from django.views.decorators.http import require_POST
-from django.shortcuts import get_object_or_404, render
-from codequestions.models import CodeQuestion  # adjust import to your app layout
-
-
+from django.views.decorators.csrf import csrf_protect
+from django.core.exceptions import ValidationError
+from codequestions.models import CodeQuestion, StandardIOQuestion, FunctionOOPQuestion
 
 def standardio_builder(request):
-    # existing default fetches for timeout/memory...
-    timeout_default = getattr(CodeQuestion, "DEFAULT_TIMEOUT_SECONDS", None)
-    memory_default  = getattr(CodeQuestion, "DEFAULT_MEMORY_LIMIT_MB", None)
-
-    if timeout_default is None:
-        try:
-            timeout_default = CodeQuestion._meta.get_field("timeout_seconds").default
-        except Exception:
-            timeout_default = 5
-    if memory_default is None:
-        try:
-            memory_default = CodeQuestion._meta.get_field("memory_limit_mb").default
-        except Exception:
-            memory_default = 128
-
-    # NEW: starter_code default
-    try:
-        starter_default = CodeQuestion._meta.get_field("starter_code").default or ""
-    except Exception:
-        starter_default = ""
-
-    return render(
-        request,
-        "codequestions/standardio_builder.html",
-        {
-            "timeout_default": timeout_default,
-            "memory_default": memory_default,
-            "starter_default": starter_default,  # NEW
-        },
-    )
-
-
-
-@require_POST
-def standardio_validate(request):
-    try:
-        payload = json.loads(request.body.decode("utf-8"))
-    except Exception:
-        return HttpResponseBadRequest("Invalid JSON")
-    ok, errors = _validate_standardio(payload)
-    return JsonResponse({"ok": ok, "errors": errors})
-
-
-
-@require_POST
-def standardio_save(request):
     """
-    Expects:
-      {
-        "spec": {...},                # standardIo compiled spec ONLY
-        "timeout_seconds": 5,
-        "memory_limit_mb": 128,
-        "starter_code": "..."         # NEW: saved on the model, not in JSON
+    Render the Standard I/O builder page.
+    """
+    context = {
+        "timeout_default": 5,
+        "memory_default": 128,
+    }
+    return render(request, "codequestions/standardio_builder.html", context)
+
+
+# ---------- Helpers ----------
+
+def _json_error(message: str, status: int = 400, errors: Dict[str, Any] | None = None):
+    payload = {"ok": False, "message": message}
+    if errors:
+        payload["errors"] = errors
+    return JsonResponse(payload, status=status)
+
+def _parse_json(request: HttpRequest) -> Dict[str, Any] | None:
+    try:
+        return json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return None
+
+def _validate_tests_json(tests_json: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Returns field-error dict. Empty dict means OK.
+    Expect shape: {"tests": [ { "name": str, "stdin": str, "stdout": str }, ... ]}
+    """
+    errors: Dict[str, str] = {}
+    if not isinstance(tests_json, dict):
+        return {"tests_json": "Expected an object."}
+    tests = tests_json.get("tests")
+    if not isinstance(tests, list) or len(tests) == 0:
+        return {"tests": "Provide at least one test."}
+
+    names: List[str] = []
+    for i, t in enumerate(tests):
+        if not isinstance(t, dict):
+            errors[f"tests[{i}]"] = "Each test must be an object."
+            continue
+        name = t.get("name", "")
+        stdout = t.get("stdout", "")
+        # stdin optional; coerce to string if present
+        if "stdin" in t and not isinstance(t.get("stdin"), str):
+            errors[f"tests[{i}].stdin"] = "stdin must be a string."
+        if not isinstance(name, str) or not name.strip():
+            errors[f"tests[{i}].name"] = "Name is required."
+        else:
+            names.append(name.strip())
+        if not isinstance(stdout, str) or not stdout.strip():
+            errors[f"tests[{i}].stdout"] = "stdout is required."
+        elif not stdout.endswith("\n"):
+            errors[f"tests[{i}].stdout"] = "stdout must end with a newline (\\n)."
+
+    # uniqueness of names
+    seen = set()
+    for i, n in enumerate(names):
+        if n in seen:
+            errors[f"tests[{i}].name"] = "Duplicate test name."
+        seen.add(n)
+
+    return errors
+
+
+# ---------- Endpoints ----------
+
+@require_POST
+@csrf_protect
+def standardio_validate(request: HttpRequest):
+    """
+    Input: raw tests_json (the inner object), e.g.
+      { "tests": [ { "name": "t1", "stdin": "", "stdout": "ok\\n" } ] }
+    Output: { ok: true } or { ok: false, errors: {...} }
+    """
+    data = _parse_json(request)
+    if data is None:
+        return _json_error("Invalid JSON body.")
+    errors = _validate_tests_json(data)
+    if errors:
+        return JsonResponse({"ok": False, "errors": errors}, status=400)
+    return JsonResponse({"ok": True})
+
+
+@require_POST
+@csrf_protect
+def standardio_save(request: HttpRequest):
+    """
+    Input: full authoring payload:
+    {
+      "id": 123?,  // optional for update
+      "question_type": "standard_io",
+      "prompt": "...",
+      "timeout_seconds": 5,
+      "memory_limit_mb": 128,
+      "standard_io": {
+        "tests_json": { "tests": [...] }
       }
+    }
+    Output: { ok: true, id: <CodeQuestion.id> } or { ok: false, errors: {...} }
     """
-    try:
-        payload = json.loads(request.body.decode("utf-8"))
-    except Exception:
-        return HttpResponseBadRequest("Invalid JSON")
+    payload = _parse_json(request)
+    if payload is None:
+        return _json_error("Invalid JSON body.")
 
-    spec = payload.get("spec")
-    if not isinstance(spec, dict):
-        return JsonResponse({"ok": False, "errors": {"spec": "Missing or invalid 'spec' object."}}, status=400)
+    # Top-level requireds
+    errors: Dict[str, Any] = {}
+    if payload.get("question_type") != CodeQuestion.QuestionType.STANDARD_IO:
+        errors["question_type"] = "Must be 'standard_io'."
 
-    ok, spec_errors = _validate_standardio(spec)
-    errors = dict(spec_errors) if not ok else {}
+    prompt = (payload.get("prompt") or "").strip()
+    if not prompt:
+        errors["prompt"] = "Prompt is required."
 
     timeout_seconds = payload.get("timeout_seconds")
+    if not isinstance(timeout_seconds, int) or timeout_seconds <= 0:
+        errors["timeout_seconds"] = "Timeout must be a positive integer."
+
     memory_limit_mb = payload.get("memory_limit_mb")
-    starter_code = payload.get("starter_code", "")
+    if not isinstance(memory_limit_mb, int) or memory_limit_mb <= 0:
+        errors["memory_limit_mb"] = "Memory limit must be a positive integer."
 
-    def _pos_int(val): return isinstance(val, int) and val > 0
-    if not _pos_int(timeout_seconds):
-        errors["timeout_seconds"] = "timeout_seconds must be a positive integer."
-    if not _pos_int(memory_limit_mb):
-        errors["memory_limit_mb"] = "memory_limit_mb must be a positive integer."
+    stdio_block = payload.get("standard_io") or {}
+    tests_json = stdio_block.get("tests_json")
 
-    # starter_code is optional; enforce string type if you want
-    if starter_code is not None and not isinstance(starter_code, str):
-        errors["starter_code"] = "starter_code must be a string."
+    test_errs = _validate_tests_json(tests_json) if tests_json is not None else {"tests_json": "tests_json is required."}
+    errors.update(test_errs)
 
     if errors:
         return JsonResponse({"ok": False, "errors": errors}, status=400)
 
-    qid = request.GET.get("id")
-    obj = get_object_or_404(CodeQuestion, pk=qid) if qid else CodeQuestion()
+    # Create or update
+    q_id = payload.get("id")
+    try:
+        with transaction.atomic():
+            if q_id:
+                # Update
+                cq = CodeQuestion.objects.select_for_update().get(id=q_id)
+                if cq.question_type != CodeQuestion.QuestionType.STANDARD_IO:
+                    return _json_error("Cannot update: existing question is not 'standard_io'.", status=409)
+                # guard: cannot have function/oop rows
+                if FunctionOOPQuestion.objects.filter(code_question=cq).exists():
+                    return _json_error("This question already has Function/OOP specs; cannot convert to Standard I/O.", status=409)
 
-    obj.compiled_spec = spec
-    if hasattr(obj, "timeout_seconds"): obj.timeout_seconds = timeout_seconds
-    if hasattr(obj, "memory_limit_mb"): obj.memory_limit_mb = memory_limit_mb
-    if hasattr(obj, "starter_code"):    obj.starter_code = starter_code  # NEW
+                cq.prompt = prompt
+                cq.timeout_seconds = timeout_seconds
+                cq.memory_limit_mb = memory_limit_mb
+                cq.full_clean()
+                cq.save()
 
-    obj.save()
-    return JsonResponse({"ok": True, "id": obj.pk})
+                stdio, _ = StandardIOQuestion.objects.get_or_create(code_question=cq)
+                stdio.tests_json = tests_json
+                stdio.full_clean()
+                stdio.save()
+            else:
+                # Create
+                cq = CodeQuestion.objects.create(
+                    question_type=CodeQuestion.QuestionType.STANDARD_IO,
+                    prompt=prompt,
+                    timeout_seconds=timeout_seconds,
+                    memory_limit_mb=memory_limit_mb,
+                )
+                StandardIOQuestion.objects.create(
+                    code_question=cq,
+                    tests_json=tests_json,
+                )
 
+    except ValidationError as ve:
+        # Model-level clean() errors
+        model_errors = {}
+        for field, msgs in ve.message_dict.items():
+            model_errors[field] = "; ".join(msgs) if isinstance(msgs, list) else str(msgs)
+        return JsonResponse({"ok": False, "errors": model_errors}, status=400)
+    except CodeQuestion.DoesNotExist:
+        return _json_error("Question not found for update.", status=404)
 
-# ------- internal validator used by both views --------
-def _validate_standardio(payload):
-    errors = {}
-
-    if payload.get("type") != "standardIo":
-        errors["type"] = "type must be 'standardIo'."
-
-    description = payload.get("description", "")
-    if not isinstance(description, str):
-        errors["description"] = "description must be a string."
-
-    tests = payload.get("tests", [])
-    if not isinstance(tests, list):
-        errors["tests"] = "tests must be a list."
-        tests = []
-
-    name_counts = {}
-    for i, t in enumerate(tests):
-        t_errors = {}
-        name = (t.get("name") or "").strip()
-        stdin = t.get("stdin", "")
-        stdout = t.get("stdout", "")
-
-        if not isinstance(name, str):
-            t_errors["name"] = "name must be a string."
-        if not isinstance(stdin, str):
-            t_errors["stdin"] = "stdin must be a string."
-        if not isinstance(stdout, str):
-            t_errors["stdout"] = "stdout must be a string."
-
-        if not name:
-            t_errors["name"] = "name is required."
-        name_counts[name] = name_counts.get(name, 0) + 1
-
-        has_content = (isinstance(stdin, str) and stdin.strip() != "") or (isinstance(stdout, str) and stdout.strip() != "")
-        if has_content and isinstance(stdout, str) and stdout.strip() == "":
-            t_errors["stdout"] = "stdout is required when a test has input/output."
-
-        if isinstance(stdout, str) and stdout and not stdout.endswith("\n"):
-            t_errors["stdout"] = (t_errors.get("stdout", "") + (" " if t_errors.get("stdout") else "") + "hint: runner expects trailing \\n.")
-
-        if t_errors:
-            errors[f"tests[{i}]"] = t_errors
-
-    for i, t in enumerate(tests):
-        name = (t.get("name") or "").strip()
-        if name and name_counts.get(name, 0) > 1:
-            errors.setdefault(f"tests[{i}]", {})
-            errors[f"tests[{i}]"]["name"] = "name must be unique."
-
-    return (len(errors) == 0), errors
+    return JsonResponse({"ok": True, "id": cq.id})

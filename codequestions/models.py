@@ -17,7 +17,7 @@ class CodeQuestion(models.Model):
         choices=QuestionType.choices,
     )
     prompt = models.TextField()
-    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="code_questions")
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="code_questions", null=True, blank=True)
 
     timeout_seconds = models.PositiveIntegerField(default=5)
     memory_limit_mb = models.PositiveIntegerField(default=128)
@@ -67,7 +67,6 @@ class StandardIOQuestion(models.Model):
     # Teacher-authored test spec. Keep structure stable; your sandbox interprets it.
     tests_json = models.JSONField(help_text="Author-provided test cases JSON (stdin/stdout pairs).")
     # Optional, language-agnostic sample scaffolds (kept out of the core).
-    starter_code = models.TextField(blank=True)
 
     class Meta:
         verbose_name = "Standard I/O Question"
