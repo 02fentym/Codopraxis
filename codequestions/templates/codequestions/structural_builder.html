@@ -252,8 +252,9 @@
         fontSize: "12px",
         tabSize: 2,
         useSoftTabs: true,
-        wrap: true,
       });
+      editor.setTheme("ace/theme/one_dark");
+
       // initial value
       editor.session.setValue(tests[idx].test_source || "");
 
