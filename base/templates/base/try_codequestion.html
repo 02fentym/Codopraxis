@@ -1,0 +1,174 @@
+{% extends "main.html" %}
+{% load static %}
+
+{% block content %}
+<!-- ensure CSRF cookie/token on first GET -->
+<form id="csrf-form" method="post" class="hidden">{% csrf_token %}</form>
+
+<div class="max-w-5xl mx-auto p-4 md:p-6">
+  <div class="mb-4">
+    <h1 class="text-2xl font-bold">Try CodeQuestion #{{ question.id }}</h1>
+    <p class="opacity-70 text-sm">
+      Language: {{ language.name }} • Runtime: {{ runtime.name }} • Entry file:
+      <code>{{ entry_filename }}</code>
+    </p>
+  </div>
+
+  <!-- Editor -->
+  <div class="card bg-base-200">
+    <div class="card-body gap-4">
+      <div id="editor" class="w-full h-72 rounded-box border border-base-300"></div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div id="status" class="text-sm opacity-70"></div>
+        <div class="join">
+          <button id="resetBtn" type="button" class="btn join-item">Reset</button>
+          <button id="runBtn" type="button" class="btn btn-primary join-item">Run tests</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results" class="mt-6 space-y-3 hidden">
+    <div id="summary" class="alert"></div>
+    <div id="perTests" class="space-y-2"></div>
+
+    <details class="collapse bg-base-200" open>
+      <summary class="collapse-title">Raw stdout / stderr</summary>
+      <div class="collapse-content">
+        <pre id="stdout" class="text-xs opacity-80"></pre>
+        <pre id="stderr" class="text-xs opacity-80"></pre>
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- Ace (CDN) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.9/ace.js"></script>
+<script>
+  // --- editor setup ---
+  const editor = ace.edit("editor");
+  editor.setTheme("ace/theme/monokai");
+  editor.session.setMode("ace/mode/{{ ace_mode|escapejs }}");
+  editor.session.setUseSoftTabs(true);
+  editor.session.setTabSize(2);
+  editor.setValue(
+`# {{ entry_filename }}
+# write your solution below
+print("hello")
+`, -1);
+
+  // --- helpers ---
+  const apiUrl = "{{ api_url }}";                 // e.g. /sandbox/run/3/
+  const langSlug = "{{ language.slug }}";         // e.g. python
+  const csrfToken = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
+
+  function setStatus(msg) { document.getElementById('status').textContent = msg || ''; }
+  function show(el, yes) { el.classList.toggle('hidden', !yes); }
+
+  // --- render results (shows failure details + stderr fallback) ---
+  function renderResults(data) {
+    const cont = document.getElementById('results');
+    const summaryEl = document.getElementById('summary');
+    const perTestsEl = document.getElementById('perTests');
+    const stdoutEl = document.getElementById('stdout');
+    const stderrEl = document.getElementById('stderr');
+
+    perTestsEl.innerHTML = '';
+    stdoutEl.textContent = data.stdout || '';
+    stderrEl.textContent = data.stderr || '';
+    cont.classList.remove('hidden');
+
+    // Parse JSONL from stdout
+    const objs = (data.stdout || '')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean)
+      .map(l => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(Boolean);
+
+    // latest summary if present
+    let summary = data.summary || null;
+    for (const o of objs) if (o && o.summary) summary = o.summary;
+
+    // per-test rows (support multiple message keys)
+    for (const o of objs) {
+      if (!o || o.summary) continue;
+      const status = o.status || 'unknown';
+      const badge = status === 'pass' ? 'badge-success'
+                 : status === 'fail' ? 'badge-error'
+                 : 'badge-warning';
+      const msg = o.message || o.reason || o.error || o.trace || '';
+      const row = document.createElement('div');
+      row.className = 'p-3 rounded-box bg-base-100 border border-base-300 flex flex-col gap-1';
+      row.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="badge ${badge}">${status}</span>
+          <span class="text-sm font-medium break-all">${o.test || 'test'}</span>
+        </div>
+        ${msg ? `<pre class="mt-1 text-xs whitespace-pre-wrap opacity-80">${msg}</pre>` : ``}
+      `;
+      perTestsEl.appendChild(row);
+    }
+
+    // overall summary/status with stderr fallback
+    const state = data.status;
+    summaryEl.className = `alert ${state === 'passed' ? 'alert-success'
+                                   : state === 'failed' ? 'alert-error'
+                                   : state === 'timeout' ? 'alert-warning'
+                                   : 'alert-warning'}`;
+    if (summary) {
+      summaryEl.textContent = `Passed ${summary.passed}, Failed ${summary.failed}, Errored ${summary.errored}`;
+    } else if (state === 'failed' || state === 'errored') {
+      const fallback = (data.stderr || data.stdout || '').slice(0, 2000);
+      summaryEl.textContent = `Status: ${state}${fallback ? ' — see raw output below' : ''}`;
+    } else if (state === 'timeout') {
+      summaryEl.textContent = `Timed out after ${data.duration_ms ?? '?'} ms`;
+    } else {
+      summaryEl.textContent = `Status: ${state}`;
+    }
+  }
+
+  // --- actions ---
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    editor.setValue(
+`# {{ entry_filename }}
+# write your solution below
+print("hello")
+`, -1);
+    setStatus('');
+    show(document.getElementById('results'), false);
+  });
+
+  document.getElementById('runBtn').addEventListener('click', async () => {
+    setStatus('Running…');
+    show(document.getElementById('results'), false);
+
+    const code = editor.getValue();
+    try {
+      const resp = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          'X-CSRFToken': csrfToken,
+        },
+        body: new URLSearchParams({ code, language: langSlug }),
+        credentials: 'same-origin',
+      });
+      const text = await resp.text();
+      if (!resp.ok) {
+        setStatus(`Error ${resp.status}`);
+        console.error(text);
+        return;
+      }
+      const data = JSON.parse(text);
+      setStatus(`Done in ${data.duration_ms ?? '?'} ms — ${data.status}`);
+      renderResults(data);
+    } catch (e) {
+      console.error(e);
+      setStatus('Network error');
+    }
+  });
+</script>
+{% endblock %}

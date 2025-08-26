@@ -4,16 +4,6 @@ from django.utils.translation import gettext_lazy as _
 import hashlib
 from sandbox.models import Runtime
 
-# --- Compatibility shims for historic migrations (do not remove) ---
-def _function_oop_assets_path(instance, filename):
-    """
-    Kept only so old migrations can import upload_to=codequestions.models._function_oop_assets_path.
-    Path value here doesn’t matter for current models; it just needs to exist.
-    """
-    # Put the file under a stable legacy-like path
-    qid = getattr(instance, "id", None) or "new"
-    return f"codequestions/oop/{qid}/{filename}"
-
 
 # ---------- CodeQuestion & StructuralTest ----------
 
