@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+    <testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.013" timestamp="2025-08-27T23:35:19.300936" hostname="8c0efd4cf6b2">
+        <testcase classname="tests.test_sum" name="test_add_small" time="0.000">
+            <failure message="assert 4 == 3&#10; +  where 4 = add(1, 2)">def test_add_small():
+&gt;       assert add(1, 2) == 3
+E       assert 4 == 3
+E        +  where 4 = add(1, 2)
+
+tests/test_sum.py:7: AssertionError</failure>
+        </testcase>
+    </testsuite>
+</testsuites>
