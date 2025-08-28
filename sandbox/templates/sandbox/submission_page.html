@@ -1,0 +1,168 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Submission Result</title>
+  <!-- Tailwind + DaisyUI (your build) -->
+  <!-- If you already load Tailwind/Daisy globally, remove these two and rely on your base template -->
+  <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+</head>
+<body class="min-h-screen bg-base-200">
+  <main class="container mx-auto p-4 md:p-8">
+    <div class="flex items-center justify-between gap-4 mb-4">
+      <h1 class="text-2xl font-semibold">Submission Result</h1>
+      <div class="flex items-center gap-2">
+        <button id="refreshBtn" class="btn btn-sm">Refresh</button>
+        <a id="jsonLink" class="btn btn-sm btn-outline" target="_blank" rel="noopener">View JSON</a>
+      </div>
+    </div>
+
+    <div id="statusCard" class="card bg-base-100 shadow-xl">
+      <div class="card-body gap-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div id="statusBadge" class="badge badge-neutral badge-lg">Loading…</div>
+            <div>
+              <div id="title" class="text-xl font-semibold">Loading…</div>
+              <div id="message" class="text-base-content/70">Please wait</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div id="runtime" class="text-sm text-base-content/60"></div>
+            <div id="created" class="text-xs text-base-content/50"></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div class="stat bg-base-200 rounded-box">
+            <div class="stat-title">Tests</div>
+            <div id="tests" class="stat-value text-lg">-</div>
+          </div>
+          <div class="stat bg-base-200 rounded-box">
+            <div class="stat-title">Failures</div>
+            <div id="failures" class="stat-value text-lg">-</div>
+          </div>
+          <div class="stat bg-base-200 rounded-box">
+            <div class="stat-title">Errors</div>
+            <div id="errors" class="stat-value text-lg">-</div>
+          </div>
+          <div class="stat bg-base-200 rounded-box">
+            <div class="stat-title">Run Time (s)</div>
+            <div id="time_s" class="stat-value text-lg">-</div>
+          </div>
+        </div>
+
+        <div id="firstFailWrap" class="hidden">
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title text-md font-medium">
+              First failing test details
+            </div>
+            <div class="collapse-content">
+              <div class="mb-1"><span class="font-semibold">Test:</span> <span id="ff_test"></span></div>
+              <div class="mb-1"><span class="font-semibold">Message:</span> <span id="ff_msg" class="whitespace-pre-wrap"></span></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="limits" class="text-sm text-base-content/60">
+          <!-- filled by JS -->
+        </div>
+      </div>
+    </div>
+
+    <div id="debugWrap" class="mt-4 hidden">
+      <div class="card bg-base-100 shadow">
+        <div class="card-body">
+          <h2 class="card-title">Debug</h2>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <div class="font-semibold mb-1">stdout (tail)</div>
+              <pre id="stdout" class="textarea textarea-bordered whitespace-pre-wrap min-h-32"></pre>
+            </div>
+            <div>
+              <div class="font-semibold mb-1">stderr (tail)</div>
+              <pre id="stderr" class="textarea textarea-bordered whitespace-pre-wrap min-h-32"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const submissionId = {{ submission_id }};
+    const jsonUrl = `/sandbox/submission/${submissionId}/?debug=1`;
+    document.getElementById('jsonLink').href = jsonUrl;
+
+    const el = (id) => document.getElementById(id);
+
+    function badgeClassFor(status) {
+      switch (status) {
+        case 'passed':  return 'badge-success';
+        case 'failed':  return 'badge-error';
+        case 'timeout': return 'badge-warning';
+        case 'error':   return 'badge-secondary';
+        default:        return 'badge-neutral';
+      }
+    }
+
+    async function load() {
+      try {
+        const res = await fetch(jsonUrl, { credentials: 'same-origin' });
+        const data = await res.json();
+
+        // header
+        const badge = el('statusBadge');
+        badge.className = `badge badge-lg ${badgeClassFor(data.status)}`;
+        badge.textContent = data.status.toUpperCase();
+
+        el('title').textContent = data.title || '';
+        el('message').textContent = data.message || '';
+
+        el('runtime').textContent = [data.runtime, data.language].filter(Boolean).join(' • ');
+        el('created').textContent = data.created ? new Date(data.created).toLocaleString() : '';
+
+        // stats
+        el('tests').textContent   = data.stats?.tests ?? '-';
+        el('failures').textContent= data.stats?.failures ?? '-';
+        el('errors').textContent  = data.stats?.errors ?? '-';
+        el('time_s').textContent  = (data.stats?.time_s ?? 0).toFixed(3);
+
+        // limits
+        const lim = data.stats || {};
+        el('limits').textContent = `Duration: ${lim.duration_s ?? '-'}s • Timeout: ${lim.timeout_seconds ?? '-'}s • Memory: ${lim.memory_limit_mb ?? '-'} MB`;
+
+        // first failure
+        if (data.first_failure) {
+          el('firstFailWrap').classList.remove('hidden');
+          el('ff_test').textContent = data.first_failure.test || '';
+          el('ff_msg').textContent  = data.first_failure.message || '';
+        } else {
+          el('firstFailWrap').classList.add('hidden');
+        }
+
+        // debug tails (only if present)
+        const dbg = data.debug || {};
+        if ((dbg.stdout_tail && dbg.stdout_tail.length) || (dbg.stderr_tail && dbg.stderr_tail.length)) {
+          el('debugWrap').classList.remove('hidden');
+          el('stdout').textContent = dbg.stdout_tail || '';
+          el('stderr').textContent = dbg.stderr_tail || '';
+        } else {
+          el('debugWrap').classList.add('hidden');
+        }
+
+      } catch (e) {
+        el('title').textContent = 'Could not load result';
+        el('message').textContent = e?.message || String(e);
+      }
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', load);
+    load();
+  </script>
+</body>
+</html>

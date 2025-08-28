@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
 from codequestions.models import CodeQuestion, StructuralTest
 from .models import Submission
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 
 
 # If you used a different tag in Step 1, change here
@@ -531,3 +531,9 @@ def submission_result(request, submission_id: int):
     debug = request.GET.get("debug") in {"1", "true", "yes"}
     payload = _student_payload_from_submission(sub, debug=debug)
     return JsonResponse(payload, status=200)
+
+
+@require_GET
+def submission_page(request, submission_id: int):
+    # Simple template that fetches JSON from /sandbox/submission/<id>/
+    return render(request, "sandbox/submission_page.html", {"submission_id": submission_id})
