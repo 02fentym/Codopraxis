@@ -1,6 +1,6 @@
 from django.db import models
+from django.conf import settings
 
-# Create your models here.
 
 class Language(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -40,3 +40,54 @@ class Runtime(models.Model):
     
 
 
+class Submission(models.Model):
+    class Status(models.TextChoices):
+        PASSED = "passed", "Passed"
+        FAILED = "failed", "Failed"
+        ERROR = "error", "Error"
+        TIMEOUT = "timeout", "Timeout"
+        OOM = "oom", "Out of Memory"
+        SANDBOX_ERROR = "sandbox_error", "Sandbox Error"
+        UNKNOWN = "unknown", "Unknown"
+
+    code_question = models.ForeignKey(
+        "codequestions.CodeQuestion",
+        on_delete=models.CASCADE,
+        related_name="submissions",
+    )
+    runtime = models.ForeignKey(
+        "sandbox.Runtime",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="submissions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="code_submissions",
+    )
+
+    job_id = models.CharField(max_length=32, db_index=True)
+    status = models.CharField(max_length=20, choices=Status.choices)
+    summary = models.JSONField(default=dict)
+    junit_xml = models.TextField(blank=True)
+    stdout_tail = models.TextField(blank=True)
+    stderr_tail = models.TextField(blank=True)
+
+    timeout_seconds = models.PositiveIntegerField(default=5)
+    memory_limit_mb = models.PositiveIntegerField(default=256)
+    duration_s = models.FloatField(null=True, blank=True)
+
+    student_code = models.TextField()
+
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def __str__(self):
+        return f"Submission #{self.pk} Q{self.code_question_id} {self.status}"

@@ -1,7 +1,8 @@
 # sandbox/urls.py
 from django.urls import path
-from .views import run_code  # adjust if using another module path
+from . import views  # adjust if using another module path
 
 urlpatterns = [
-    path("run/", run_code, name="sandbox-run"),
+    path("run/", views.run_code, name="sandbox-run"),
+    path("submission/<int:submission_id>/", views.submission_result, name="sandbox-submission"),
 ]
