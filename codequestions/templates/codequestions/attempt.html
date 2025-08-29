@@ -1,0 +1,177 @@
+{% extends "main.html" %}
+{% load static %}
+
+{% block content %}
+<!-- ensure CSRF cookie/token on first GET -->
+<form id="csrf-form" method="post" class="hidden">{% csrf_token %}</form>
+
+<div class="max-w-5xl mx-auto p-4 md:p-6">
+    <div class="mb-4">
+        <h1 class="text-2xl font-bold">Try CodeQuestion #{{ question.id }}</h1>
+        <p class="opacity-70 text-sm">
+            Language: {{ language.name }} • Runtime: {{ runtime.name }} • Entry file:
+            <code>{{ entry_filename }}</code>
+        </p>
+    </div>
+
+    <!-- Editor -->
+    <div class="card bg-base-200">
+        <div class="card-body gap-4">
+            <div id="editor" class="w-full h-72 rounded-box border border-base-300"></div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div id="status" class="text-sm opacity-70"></div>
+                <div class="join">
+                    <button id="resetBtn" type="button" class="btn join-item">Reset</button>
+                    <button id="runBtn" type="button" class="btn btn-primary join-item">Run tests</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="mt-6 space-y-3 hidden">
+        <div id="summary" class="alert"></div>
+        <div id="perTests" class="space-y-2"></div>
+
+        <details class="collapse bg-base-200" open>
+            <summary class="collapse-title">Raw stdout / stderr</summary>
+            <div class="collapse-content">
+                <pre id="stdout" class="text-xs opacity-80"></pre>
+                <pre id="stderr" class="text-xs opacity-80"></pre>
+            </div>
+        </details>
+    </div>
+</div>
+
+<!-- Ace (CDN) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.9/ace.js"></script>
+<script>
+    // --- editor setup ---
+    const editor = ace.edit("editor");
+    editor.setTheme("ace/theme/monokai");
+    editor.session.setMode("ace/mode/{{ ace_mode|escapejs }}");
+    editor.session.setUseSoftTabs(true);
+    editor.session.setTabSize(2);
+    editor.setValue(
+        `# {{ entry_filename }}
+# write your solution below
+print("hello")
+`, -1);
+
+    // --- helpers / context from Django ---
+    const apiUrl = "{{ api_url }}";                 // e.g. "/sandbox/run/"
+    const langSlug = "{{ lang_slug }}"; // "python" etc.
+    const csrfToken = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]').value;
+    const questionId = {{ question.id }};
+    const runtimeId = {{ runtime_id|default:'null' }}; // null if not set
+
+    const $ = (id) => document.getElementById(id);
+    const setStatus = (msg) => $('status').textContent = msg || '';
+    const show = (el, yes) => el.classList.toggle('hidden', !yes);
+
+    function badgeFor(state) {
+        return state === 'passed' ? 'alert-success'
+            : state === 'failed' ? 'alert-error'
+                : state === 'timeout' ? 'alert-warning'
+                    : state === 'error' ? 'alert-warning'
+                        : 'alert-info';
+    }
+
+    // --- render results using our backend shape ---
+    function renderResults(data) {
+        const cont = $('results');
+        const summaryEl = $('summary');
+        const perTestsEl = $('perTests');
+        const stdoutEl = $('stdout');
+        const stderrEl = $('stderr');
+
+        perTestsEl.innerHTML = '';
+        stdoutEl.textContent = data.stdout_tail || '';
+        stderrEl.textContent = data.stderr_tail || '';
+        cont.classList.remove('hidden');
+
+        // Summary
+        const tests = data.summary?.tests ?? 0;
+        const fails = data.summary?.failures ?? 0;
+        const errors = data.summary?.errors ?? 0;
+        const time_s = data.summary?.time_s ?? 0;
+        const state = data.status || 'unknown';
+
+        summaryEl.className = `alert ${badgeFor(state)}`;
+        summaryEl.textContent =
+            state === 'passed'
+                ? `All tests passed — ${tests} total (time: ${time_s.toFixed(3)}s)`
+                : state === 'timeout'
+                    ? `Timed out after ~${(data.duration_s ?? 0).toFixed(3)}s`
+                    : `Status: ${state.toUpperCase()} — Tests: ${tests}, Failures: ${fails}, Errors: ${errors}`;
+
+        // First failing test (if any)
+        const ff = data.first_failure;
+        if (ff) {
+            const row = document.createElement('div');
+            row.className = 'p-3 rounded-box bg-base-100 border border-base-300 flex flex-col gap-1';
+            row.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="badge badge-error">failed</span>
+          <span class="text-sm font-medium break-all">${ff.test || 'test'}</span>
+        </div>
+        ${ff.message ? `<pre class="mt-1 text-xs whitespace-pre-wrap opacity-80">${ff.message}</pre>` : ``}
+      `;
+            perTestsEl.appendChild(row);
+        }
+    }
+
+    // --- actions ---
+    $('resetBtn').addEventListener('click', () => {
+        editor.setValue(
+            `# {{ entry_filename }}
+# write your solution below
+print("hello")
+`, -1);
+        setStatus('');
+        show($('results'), false);
+    });
+
+    $('runBtn').addEventListener('click', async () => {
+        setStatus('Running…');
+        show($('results'), false);
+
+        const code = editor.getValue();
+        const payload = {
+            code_question_id: questionId,
+            student_code: code,
+            language: langSlug,
+        };
+        if (runtimeId) payload.runtime_id = runtimeId;
+
+        try {
+            const resp = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,          // harmless even though /sandbox/run is csrf_exempt
+                },
+                body: JSON.stringify(payload),
+                credentials: 'same-origin',
+            });
+
+            const text = await resp.text();
+            if (!resp.ok) {
+                setStatus(`Error ${resp.status}`);
+                console.error(text);
+                return;
+            }
+            const data = JSON.parse(text);
+            setStatus(`Done in ${(data.duration_s ?? 0).toFixed(3)}s — ${data.status.toUpperCase()}`);
+            renderResults(data);
+        } catch (e) {
+            console.error(e);
+            setStatus('Network error');
+        }
+    });
+</script>
+
+
+
+{% endblock %}

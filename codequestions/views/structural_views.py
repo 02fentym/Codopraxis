@@ -1,14 +1,12 @@
-from django.shortcuts import render
-from sandbox.models import Runtime
+from django.shortcuts import render, get_object_or_404
 import json
 from django.db import transaction
 from django.http import JsonResponse, HttpRequest
-from django.views.decorators.http import require_POST
-from django.middleware.csrf import get_token
+from django.views.decorators.http import require_POST, require_GET
 from django.core.exceptions import ValidationError
-
 from sandbox.models import Runtime
 from codequestions.models import CodeQuestion, StructuralTest
+
 
 def structural_builder(request):
     qs = (
@@ -162,3 +160,80 @@ def structural_save(request: HttpRequest) -> JsonResponse:
 
 
     return JsonResponse({"ok": True, "id": q.id})
+
+
+def _ace_mode_for(lang: str) -> str:
+    l = (lang or "").lower()
+    return {
+        "python": "python",
+        "java": "java",
+        "javascript": "javascript",
+        "typescript": "typescript",
+        "c": "c_cpp",
+        "c++": "c_cpp",
+        "cpp": "c_cpp",
+        "go": "golang",
+        "golang": "golang",
+        "ruby": "ruby",
+        "php": "php",
+    }.get(l, "text")
+
+def _entry_filename_for(lang: str) -> str:
+    l = (lang or "").lower()
+    if l == "python": return "student.py"
+    if l == "java": return "Main.java"
+    if l in {"c", "c++", "cpp"}: return "main.c" if l == "c" else "main.cpp"
+    if l == "javascript": return "main.js"
+    if l == "typescript": return "main.ts"
+    if l in {"go", "golang"}: return "main.go"
+    return "main.txt"
+
+@require_GET
+def attempt_codequestion(request, qid: int):
+    """
+    Student-facing attempt page with Ace editor.
+    """
+    q = get_object_or_404(CodeQuestion, pk=qid)
+
+    # Only STRUCTURAL for now
+    if str(getattr(q, "question_type", "")).upper() != "STRUCTURAL":
+        return render(request, "codequestions/not_supported.html", {"q": q}, status=400)
+
+    tests = (
+        StructuralTest.objects
+        .filter(code_question=q)
+        .select_related("runtime", "runtime__language")
+        .order_by("runtime_id")
+    )
+
+    # Pick a default runtime (first, if any). You can add a selector later.
+    runtime = tests[0].runtime if tests else None
+    language_obj = getattr(runtime, "language", None)
+    language_name = getattr(language_obj, "name", "") or "Python"
+    lang_slug = getattr(language_obj, "slug", None) or language_name.lower()
+    runtime_id = getattr(runtime, "id", None)
+
+    starter_code = getattr(q, "starter_code", "") or ""
+    ace_mode = _ace_mode_for(language_name)
+    entry_filename = _entry_filename_for(language_name)
+
+    context = {
+        # what your template expects
+        "question": q,
+        "language": language_obj,   # safe if None; template will render empty
+        "runtime": runtime,         # safe if None
+        "entry_filename": entry_filename,
+        "ace_mode": ace_mode,
+        "api_url": "/sandbox/run/",
+
+        # JS-friendly fields to avoid the |default filter problem
+        "lang_slug": lang_slug,
+        "runtime_id": runtime_id,
+
+        # keep these if you still use them elsewhere
+        "q": q,
+        "tests": tests,
+        "starter_code": starter_code,
+    }
+    return render(request, "codequestions/attempt.html", context)
+
