@@ -9,25 +9,36 @@
 
         <li>
             <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3L2 12h3v8h5Z"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3L2 12h3v8h5Z" />
+                </svg>
                 Home
             </a>
         </li>
         <li>
             <a href="#" class="{% if request.resolver_match.url_name == 'courses' %}active{% endif %}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L0 9l12 7l10-5.833V17.5h2V9L12 2ZM3.999 13.49V18a9.985 9.985 0 0 0 8 4A9.985 9.985 0 0 0 20 18v-4.509l-8 4.667l-8-4.668Z"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                        d="M12 2L0 9l12 7l10-5.833V17.5h2V9L12 2ZM3.999 13.49V18a9.985 9.985 0 0 0 8 4A9.985 9.985 0 0 0 20 18v-4.509l-8 4.667l-8-4.668Z" />
+                </svg>
                 Courses
             </a>
         </li>
         <li>
             <a href="#" class="{% if request.resolver_match.url_name == 'quizzes' %}active{% endif %}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5a5.5 5.5 0 0 1 3.559 9.53L22 18.47l-3.535 3.535l-6.44-6.44a5.5 5.5 0 1 1 3.52-9.065ZM12 4.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 0 0 0-7Z"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                        d="M12 2.5a5.5 5.5 0 0 1 3.559 9.53L22 18.47l-3.535 3.535l-6.44-6.44a5.5 5.5 0 1 1 3.52-9.065ZM12 4.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 0 0 0-7Z" />
+                </svg>
                 Quizzes
             </a>
         </li>
         <li>
             <a href="#" class="{% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 1 0v-2A.5.5 0 0 0 12 1ZM4.34 3.66a.5.5 0 0 0-.707.707L6.59 7.273a.5.5 0 1 0 .707-.707L4.34 3.66ZM2.5 12a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 1 0v-2a.5.5 0 0 0-.5-.5Zm1.5 8.16a.5.5 0 0 0-.707-.707L3.66 19.66a.5.5 0 0 0 .707.707L4.34 20.16ZM12 21.5a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-1 0v2a.5.5 0 0 0 .5.5Zm7.27-14.93c.196-.195.196-.512 0-.707a.5.5 0 0 0-.707 0L17.41 7.27a.5.5 0 0 0 0 .707a.5.5 0 0 0 .707 0l1.414-1.414ZM21.5 12a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 1 0v-2a.5.5 0 0 0-.5-.5Zm-1.43 8.16a.5.5 0 0 0 .707.707l1.414-1.414a.5.5 0 0 0-.707-.707L20.07 20.16ZM12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8Zm0 2a2 2 0 1 1 0 4a2 2 0 0 1 0-4Z"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                        d="M12 1a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 1 0v-2A.5.5 0 0 0 12 1ZM4.34 3.66a.5.5 0 0 0-.707.707L6.59 7.273a.5.5 0 1 0 .707-.707L4.34 3.66ZM2.5 12a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 1 0v-2a.5.5 0 0 0-.5-.5Zm1.5 8.16a.5.5 0 0 0-.707-.707L3.66 19.66a.5.5 0 0 0 .707.707L4.34 20.16ZM12 21.5a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-1 0v2a.5.5 0 0 0 .5.5Zm7.27-14.93c.196-.195.196-.512 0-.707a.5.5 0 0 0-.707 0L17.41 7.27a.5.5 0 0 0 0 .707a.5.5 0 0 0 .707 0l1.414-1.414ZM21.5 12a.5.5 0 0 0-.5.5v2a.5.5 0 0 0 1 0v-2a.5.5 0 0 0-.5-.5Zm-1.43 8.16a.5.5 0 0 0 .707.707l1.414-1.414a.5.5 0 0 0-.707-.707L20.07 20.16ZM12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8Zm0 2a2 2 0 1 1 0 4a2 2 0 0 1 0-4Z" />
+                </svg>
                 Settings
             </a>
         </li>
@@ -36,16 +47,46 @@
     <ul class="menu px-4 pb-4 border-t border-base-300">
         <li class="menu-title mt-2">Account</li>
         <li>
-            <div class="px-2 py-1 text-sm text-neutral-content">{{ user.email }}</div>
+            <div class="flex items-center gap-3 px-2 py-2">
+                <!-- Avatar -->
+                <div class="avatar avatar-placeholder">
+                    <div class="bg-base-300 text-base-content w-10 h-10 rounded-full">
+                        <span class="text-sm font-bold uppercase">
+                            {% if user.first_name or user.last_name %}
+                            {{ user.first_name|first|default:"" }}{{ user.last_name|first|default:"" }}
+                            {% else %}
+                            ?
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                <!-- User info -->
+                <div class="flex flex-col">
+                    <span class="text-sm font-semibold">
+                        {% if user.first_name or user.last_name %}
+                        {{ user.first_name }} {{ user.last_name }}
+                        {% else %}
+                        Anonymous User
+                        {% endif %}
+                    </span>
+                    <span class="text-xs text-neutral-content">{{ user.email }}</span>
+                </div>
+            </div>
         </li>
         <li>
             <form method="post" action="{% url 'logout' %}">
                 {% csrf_token %}
                 <button class="flex items-center gap-1" type="submit">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M13.496 21H6.5c-1.105 0-2-1.151-2-2.571V5.57c0-1.419.895-2.57 2-2.57h7M16 15.5l3.5-3.5L16 8.5m-6.5 3.496h10"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                        fill="currentColor">
+                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="1"
+                            d="M13.496 21H6.5c-1.105 0-2-1.151-2-2.571V5.57c0-1.419.895-2.57 2-2.57h7M16 15.5l3.5-3.5L16 8.5m-6.5 3.496h10" />
+                    </svg>
                     Logout
                 </button>
             </form>
         </li>
     </ul>
+
 </aside>
