@@ -1,5 +1,5 @@
 # sandbox/views.py
-import time, json, os, shutil, subprocess, datetime,tempfile, uuid, xml.etree.ElementTree as ET
+import time, json, os, shutil, subprocess, re, tempfile, uuid, xml.etree.ElementTree as ET
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
@@ -8,8 +8,30 @@ from .models import Submission
 from django.shortcuts import get_object_or_404, render, redirect
 
 
-# If you used a different tag in Step 1, change here
 DOCKER_IMAGE = "cp-python-runner:0.1"
+
+JAVA_PACKAGE_RE = re.compile(r'^\s*package\s+([A-Za-z0-9_.]+)\s*;', re.MULTILINE)
+JAVA_CLASS_RE   = re.compile(r'public\s+(?:final\s+|abstract\s+)?class\s+([A-Za-z_][A-Za-z0-9_]*)\b')
+
+
+def _java_path_from_source(src: str, default_basename: str = "Tests"):
+    """
+    Returns (rel_dir, filename) for the test source. If a package is declared,
+    we convert it to a folder path. If we can find a public class, we use it as the filename.
+    """
+    pkg = None
+    m_pkg = JAVA_PACKAGE_RE.search(src or "")
+    if m_pkg:
+        pkg = m_pkg.group(1).strip().replace(".", "/")
+
+    cls = None
+    m_cls = JAVA_CLASS_RE.search(src or "")
+    if m_cls:
+        cls = m_cls.group(1).strip()
+
+    basename = f"{cls or default_basename}.java"
+    rel_dir = pkg or ""  # e.g., "com/example/tests"
+    return rel_dir, basename
 
 
 def _normalize_junit_str(xml_text: str):
@@ -225,12 +247,12 @@ def run_code(request):
     {
       "code_question_id": 123,          # preferred path (uses DB tests)
       "runtime_id": 5,                   # optional; else choose by language or auto if single
-      "language": "python",              # optional selector when multiple runtimes exist
+      "language": "python|java",         # optional selector when multiple runtimes exist (or required in dev mode)
       "student_code": "...",             # required
       "timeout_seconds": 3,              # optional override (defaults from CodeQuestion, else 5)
       "memory_limit_mb": 256             # optional override (defaults from CodeQuestion, else 256)
     }
-    Fallback dev mode (if no code_question_id): pass "tests_code".
+    Fallback dev mode (if no code_question_id): must pass "tests_code" and "language".
     Returns normalized JSON and never 500s for persistence errors (adds 'persistence_error').
     """
     # ---- Parse & validate payload ----
@@ -305,18 +327,28 @@ def run_code(request):
                                          "available": available}, status=400)
 
         runtime_lang = (getattr(chosen_runtime.language, "name", "") or "").strip().lower()
-        if runtime_lang != "python":
-            return HttpResponseBadRequest("Only Python runtimes are supported at this step.")
+        if runtime_lang not in {"python", "java"}:
+            return HttpResponseBadRequest("Supported languages for this step: python, java.")
 
-    # ---- Dev fallback (Step 2): allow inline tests_code ----
+    # ---- Dev fallback: inline tests_code + language (required) ----
     else:
         tests_code = (payload.get("tests_code") or "").strip()
         if not tests_code:
             return HttpResponseBadRequest("Either provide code_question_id OR tests_code.")
+        if lang_hint not in {"python", "java"}:
+            return HttpResponseBadRequest("When using tests_code, you must pass language: 'python' or 'java'.")
+        runtime_lang = lang_hint  # no chosen_runtime in this mode
 
     # ---- Limits (payload overrides question defaults) ----
     timeout_seconds = int(payload.get("timeout_seconds") or cq_timeout or 5)
     memory_limit_mb = int(payload.get("memory_limit_mb") or cq_memory or 256)
+
+    # ---- Pick docker image ----
+    if cq_id and chosen_runtime and getattr(chosen_runtime, "docker_image", ""):
+        docker_image = chosen_runtime.docker_image
+    else:
+        # Fallback to known tags
+        docker_image = "cp-python-runner:0.1" if runtime_lang == "python" else "cp-java-runner:0.1"
 
     # ---- Workspace ----
     job_id = str(uuid.uuid4())[:8]
@@ -329,17 +361,32 @@ def run_code(request):
         os.makedirs(student_dir, exist_ok=True)
         os.makedirs(tests_dir, exist_ok=True)
 
-        # Student file
-        with open(os.path.join(student_dir, "student.py"), "w", encoding="utf-8") as f:
-            f.write(student_code)
+        # ---- Write files per language ----
+        if runtime_lang == "python":
+            # Student
+            with open(os.path.join(student_dir, "student.py"), "w", encoding="utf-8") as f:
+                f.write(student_code)
 
-        # Teach pytest where to import student code
-        with open(os.path.join(tests_dir, "conftest.py"), "w", encoding="utf-8") as f:
-            f.write('import sys; sys.path.append("/workspace/student")\n')
+            # Make student importable for pytest
+            with open(os.path.join(tests_dir, "conftest.py"), "w", encoding="utf-8") as f:
+                f.write('import sys; sys.path.append("/workspace/student")\n')
 
-        # Teacher tests
-        with open(os.path.join(tests_dir, "test_student.py"), "w", encoding="utf-8") as f:
-            f.write(tests_code)
+            # Tests
+            with open(os.path.join(tests_dir, "test_student.py"), "w", encoding="utf-8") as f:
+                f.write(tests_code)
+
+        else:  # JAVA
+            # Student entry filename (from runtime if available)
+            entry_fn = (getattr(chosen_runtime, "default_entry_filename", None) or "Main.java") if cq_id else "Main.java"
+            with open(os.path.join(student_dir, entry_fn), "w", encoding="utf-8") as f:
+                f.write(student_code)
+
+            # Teacher tests: respect package/class for filename & folders
+            rel_dir, filename = _java_path_from_source(tests_code, default_basename="Tests")
+            target_dir = os.path.join(tests_dir, rel_dir) if rel_dir else tests_dir
+            os.makedirs(target_dir, exist_ok=True)
+            with open(os.path.join(target_dir, filename), "w", encoding="utf-8") as f:
+                f.write(tests_code)
 
         # ---- Docker run ----
         docker_cmd = [
@@ -353,10 +400,12 @@ def run_code(request):
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
             "--security-opt", "no-new-privileges",
             "--cap-drop", "ALL",
-            "-e", f"RUN_TIMEOUT={timeout_seconds}",
+            "-e", f"RUN_TIMEOUT={timeout_seconds}",      # used by python runner; harmless in java
             "-e", "REPORT_PATH=/workspace/report.xml",
-            DOCKER_IMAGE,
+            docker_image,
         ]
+
+        host_timeout = max(2, timeout_seconds + (5 if runtime_lang == "java" else 2))
 
         start_ts = time.time()
         try:
@@ -364,7 +413,7 @@ def run_code(request):
                 docker_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=max(2, timeout_seconds + 2),
+                timeout=host_timeout,
                 check=False,
                 text=True,
             )
@@ -406,66 +455,9 @@ def run_code(request):
             return JsonResponse(result, status=200)
 
         # ---- Parse JUnit (container completed) ----
-        def _normalize_junit(path: str):
-            if not os.path.exists(path):
-                return {
-                    "status": "sandbox_error",
-                    "summary": {"tests": 0, "failures": 0, "errors": 0, "time_s": 0.0},
-                    "message": "JUnit report not found."
-                }
-            tree = ET.parse(path)
-            root = tree.getroot()
-            suites = [root] if root.tag == "testsuite" else list(root.findall("testsuite"))
-            total_tests = total_failures = total_errors = 0
-            total_time = 0.0
-            first_failure = None
-
-            def as_float(x, default=0.0):
-                try: return float(x)
-                except Exception: return default
-
-            for suite in suites:
-                total_tests    += int(suite.get("tests", 0))
-                total_failures += int(suite.get("failures", 0))
-                total_errors   += int(suite.get("errors", 0))
-                total_time     += as_float(suite.get("time", 0.0))
-                if first_failure is None:
-                    for case in suite.findall("testcase"):
-                        failure = case.find("failure")
-                        error   = case.find("error")
-                        if failure is not None or error is not None:
-                            node = failure if failure is not None else error
-                            first_failure = {
-                                "suite": suite.get("name", "") or "",
-                                "test": case.get("name", "") or "",
-                                "message": (node.get("message", "") or "")[:2000],
-                                "type": node.get("type", "") or "",
-                                "time_s": as_float(case.get("time", 0.0)),
-                                "details": (node.text or "")[:4000],
-                            }
-                            break
-
-            if total_errors > 0:
-                status = "error"
-            elif total_failures > 0:
-                status = "failed"
-            else:
-                status = "passed"
-
-            return {
-                "status": status,
-                "summary": {
-                    "tests": total_tests,
-                    "failures": total_failures,
-                    "errors": total_errors,
-                    "time_s": total_time,
-                },
-                "first_failure": first_failure,
-            }
-
         result = _normalize_junit(report_path)
 
-        # Reclassify pytest-timeout signatures as timeout
+        # Reclassify pytest-timeout (or similar) signatures as timeout
         ff = result.get("first_failure")
         if result.get("status") == "failed" and ff:
             msg = (ff.get("message") or "") + " " + (ff.get("details") or "")

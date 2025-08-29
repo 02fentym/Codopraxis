@@ -67,15 +67,10 @@
             </div>
           </div>
 
-          <div class="divider my-0 w-auto text-lg font-bold mb-6">Per‑runtime structural tests</div>
+          <div class="divider my-0 w-auto text-lg font-bold mb-6">Per-runtime structural tests</div>
 
           <!-- Tests container -->
           <div id="testsContainer" class="space-y-6"></div>
-
-          <!-- Add Runtime Test -->
-          <div class="flex gap-2 justify-center">
-            <button id="addTestBtn" type="button" class="btn btn-primary btn-sm">+ Runtime test</button>
-          </div>
         </form>
       </div>
     </div>
@@ -134,78 +129,69 @@
 <script src="{% static 'vendor/ace-1.36.2/ext-language_tools.js' %}"></script>
 
 <script>
-(function () {
-  const $ = (id) => document.getElementById(id);
+  (function () {
+    const $ = (id) => document.getElementById(id);
 
-  const promptEl = $("prompt");
-  const timeoutEl = $("timeout_seconds");
-  const memoryEl = $("memory_limit_mb");
+    const promptEl = $("prompt");
+    const timeoutEl = $("timeout_seconds");
+    const memoryEl = $("memory_limit_mb");
 
-  const errPrompt = $("err_prompt");
-  const errTimeout = $("err_timeout");
-  const errMemory = $("err_memory");
+    const errPrompt = $("err_prompt");
+    const errTimeout = $("err_timeout");
+    const errMemory = $("err_memory");
 
-  const testsContainer = $("testsContainer");
-  const questionPreview = $("questionPreview");
-  const testsPreview = $("testsPreview");
+    const testsContainer = $("testsContainer");
+    const questionPreview = $("questionPreview");
+    const testsPreview = $("testsPreview");
 
-  const addTestBtn = $("addTestBtn");
-  const validateBtn = $("validateBtn");
-  const saveBtn = $("saveBtn");
-  const toastOk = $("toastOk");
-  const toastErr = $("toastErr");
-  const toastSaveOk = $("toastSaveOk");
-  const toastSaveErr = $("toastSaveErr");
+    const validateBtn = $("validateBtn");
+    const saveBtn = $("saveBtn");
+    const toastOk = $("toastOk");
+    const toastErr = $("toastErr");
+    const toastSaveOk = $("toastSaveOk");
+    const toastSaveErr = $("toastSaveErr");
 
-  // ----- CSRF + runtimes -----
-  function getCookie(name) {
-    const v = document.cookie.split("; ").find(row => row.startsWith(name + "="));
-    return v ? decodeURIComponent(v.split("=")[1]) : null;
-  }
-  const csrftoken = getCookie("csrftoken");
+    // ----- CSRF + runtimes -----
+    function getCookie(name) {
+      const v = document.cookie.split("; ").find(row => row.startsWith(name + "="));
+      return v ? decodeURIComponent(v.split("=")[1]) : null;
+    }
+    const csrftoken = getCookie("csrftoken");
 
-  const RUNTIMES = JSON.parse(document.getElementById("runtimes-data").textContent);
-  // Normalize: ensure we have a mode hint (syntax_highlighter_mode if provided, else language.slug)
-  const RUNTIME_BY_ID = {};
-  RUNTIMES.forEach(rt => {
-    const lang = rt.language || {};
-    rt._mode = (lang.syntax_highlighter_mode || lang.slug || "text").toLowerCase();
-    RUNTIME_BY_ID[rt.id] = rt;
-  });
+    const RUNTIMES = JSON.parse(document.getElementById("runtimes-data").textContent);
+    const RUNTIME_BY_ID = {};
+    RUNTIMES.forEach(rt => {
+      const lang = rt.language || {};
+      rt._mode = (lang.syntax_highlighter_mode || lang.slug || "text").toLowerCase();
+      RUNTIME_BY_ID[rt.id] = rt;
+    });
 
-  // ----- Ace setup -----
-  ace.config.set("basePath", "{% static 'vendor/ace-1.36.2' %}");
-  ace.require("ace/ext/language_tools");
+    // ----- Ace setup -----
+    ace.config.set("basePath", "{% static 'vendor/ace-1.36.2' %}");
+    ace.require("ace/ext/language_tools");
 
-  // Per-card editors, indexed by card idx
-  let editors = [];
+    let editors = [];
 
-  // ----- State -----
-  // Each test: { runtime_id, test_source }
-  let tests = [
-    { runtime_id: null, test_source: "" }
-  ];
+    // Single test state
+    let tests = [
+      { runtime_id: null, test_source: "" }
+    ];
 
-  // ----- Renderers -----
-  function runtimeOptionsHTML(selectedId) {
-    return ['<option value="">— Select runtime —</option>']
-      .concat(RUNTIMES.map(rt => {
-        const label = `${rt.language.name} · ${rt.name}`;
-        const sel = String(selectedId || "") === String(rt.id) ? " selected" : "";
-        return `<option value="${rt.id}"${sel}>${label}</option>`;
-      })).join("");
-  }
+    function runtimeOptionsHTML(selectedId) {
+      return ['<option value="">— Select runtime —</option>']
+        .concat(RUNTIMES.map(rt => {
+          const label = `${rt.language.name} · ${rt.name}`;
+          const sel = String(selectedId || "") === String(rt.id) ? " selected" : "";
+          return `<option value="${rt.id}"${sel}>${label}</option>`;
+        })).join("");
+    }
 
-  function testCardTemplate(idx, t) {
-    const n = idx + 1;
-    const runtimeId = `runtime_${n}`;
-    const editorId = `editor_${n}`;
-    return `
+    function testCardTemplate(idx, t) {
+      const runtimeId = `runtime_${idx + 1}`;
+      const editorId = `editor_${idx + 1}`;
+      return `
       <div class="space-y-3 border border-2 border-base-100 rounded-box px-4 py-2" data-test-index="${idx}">
-        <div class="flex items-center justify-between my-2">
-          <div class="font-medium text-lg">Runtime test #${n}</div>
-          <button type="button" class="btn btn-ghost btn-sm" data-action="removeCard" ${tests.length === 1 ? "disabled" : ""}>Remove</button>
-        </div>
+        <div class="font-medium text-lg">Runtime test</div>
 
         <!-- Runtime -->
         <div class="form-control">
@@ -218,7 +204,7 @@
           <p class="text-error text-xs mt-1 hidden" data-err="runtime"></p>
         </div>
 
-        <!-- Test source (Ace editor replaces the textarea) -->
+        <!-- Test source -->
         <div class="form-control">
           <label class="label block">
             <span class="label-text font-medium">Test source</span>
@@ -229,200 +215,150 @@
         </div>
       </div>
     `;
-  }
+    }
 
-  function destroyEditors() {
-    editors.forEach(ed => {
-      try { ed?.destroy(); } catch (_) {}
-    });
-    editors = [];
-  }
+    function destroyEditors() {
+      editors.forEach(ed => { try { ed?.destroy(); } catch (_) {} });
+      editors = [];
+    }
 
-  function initEditors() {
-    const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
-    sections.forEach((section, idx) => {
-      const edDiv = section.querySelector('[data-role="ace"]');
-      const runtimeSel = section.querySelector('[data-role="runtime"]');
+    function initEditors() {
+      const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
+      sections.forEach((section, idx) => {
+        const edDiv = section.querySelector('[data-role="ace"]');
+        const runtimeSel = section.querySelector('[data-role="runtime"]');
 
-      const editor = ace.edit(edDiv);
-      editor.setOptions({
-        enableBasicAutocompletion: true,
-        enableLiveAutocompletion: false,
-        enableSnippets: false,
-        fontSize: "12px",
-        tabSize: 2,
-        useSoftTabs: true,
+        const editor = ace.edit(edDiv);
+        editor.setOptions({
+          enableBasicAutocompletion: true,
+          enableLiveAutocompletion: false,
+          enableSnippets: false,
+          fontSize: "12px",
+          tabSize: 2,
+          useSoftTabs: true,
+        });
+        editor.setTheme("ace/theme/one_dark");
+
+        editor.session.setValue(tests[idx].test_source || "");
+
+        const rtId = runtimeSel.value ? Number(runtimeSel.value) : null;
+        const mode = rtId ? (RUNTIME_BY_ID[rtId]?._mode || "text") : "text";
+        editor.session.setMode("ace/mode/" + mode);
+
+        editors[idx] = editor;
+
+        runtimeSel.addEventListener("change", () => {
+          const rid = runtimeSel.value ? Number(runtimeSel.value) : null;
+          const m = rid ? (RUNTIME_BY_ID[rid]?._mode || "text") : "text";
+          editor.session.setMode("ace/mode/" + m);
+          renderPreview();
+        });
+
+        editor.session.on("change", debounce(renderPreview, 150));
       });
-      editor.setTheme("ace/theme/one_dark");
+    }
 
-      // initial value
-      editor.session.setValue(tests[idx].test_source || "");
+    function renderTests() {
+      destroyEditors();
+      testsContainer.innerHTML = tests.map((t, i) => testCardTemplate(i, t)).join("");
+      initEditors();
+    }
 
-      // set initial mode
-      const rtId = runtimeSel.value ? Number(runtimeSel.value) : null;
-      const mode = rtId ? (RUNTIME_BY_ID[rtId]?._mode || "text") : "text";
-      editor.session.setMode("ace/mode/" + mode);
+    function coerceStateFromDOM() {
+      const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
+      tests = sections.map((section, idx) => {
+        const runtimeSel = section.querySelector('[data-role="runtime"]');
+        const editor = editors[idx];
+        return {
+          runtime_id: runtimeSel.value ? Number(runtimeSel.value) : null,
+          test_source: (editor?.getValue() || "").trim()
+        };
+      });
+    }
 
-      // keep in array
-      editors[idx] = editor;
+    function validateClient() {
+      coerceStateFromDOM();
+      let ok = true;
 
-      // on runtime change, update mode
-      runtimeSel.addEventListener("change", () => {
-        const rid = runtimeSel.value ? Number(runtimeSel.value) : null;
-        const m = rid ? (RUNTIME_BY_ID[rid]?._mode || "text") : "text";
-        editor.session.setMode("ace/mode/" + m);
-        renderPreview(); // since runtime changed
+      if (!promptEl.value.trim()) {
+        ok = false;
+        errPrompt.textContent = "Prompt is required.";
+        errPrompt.classList.remove("hidden");
+      } else {
+        errPrompt.classList.add("hidden");
+      }
+
+      const timeout = Number(timeoutEl.value);
+      const memory = Number(memoryEl.value);
+      if (!(Number.isInteger(timeout) && timeout > 0)) {
+        ok = false; errTimeout.textContent = "Enter a positive integer."; errTimeout.classList.remove("hidden");
+      } else { errTimeout.classList.add("hidden"); }
+      if (!(Number.isInteger(memory) && memory > 0)) {
+        ok = false; errMemory.textContent = "Enter a positive integer."; errMemory.classList.remove("hidden");
+      } else { errMemory.classList.add("hidden"); }
+
+      const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
+      const runtimeIds = [];
+      sections.forEach((section, idx) => {
+        const rt = tests[idx].runtime_id;
+        const src = tests[idx].test_source;
+        if (!rt) { ok = false; section.querySelector('[data-err="runtime"]').textContent = "Select a runtime."; }
+        if (!src) { ok = false; section.querySelector('[data-err="test_source"]').textContent = "Test source is required."; }
+        runtimeIds.push(rt);
       });
 
-      // on edit, update preview (debounced)
-      editor.session.on("change", debounce(renderPreview, 150));
-    });
-  }
+      if (runtimeIds.filter(Boolean).length === 0) ok = false;
 
-  function renderTests() {
-    destroyEditors();
-    testsContainer.innerHTML = tests.map((t, i) => testCardTemplate(i, t)).join("");
-    initEditors();
-  }
+      return ok;
+    }
 
-  // ----- Validation & state -----
-  function coerceStateFromDOM() {
-    const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
-    tests = sections.map((section, idx) => {
-      const runtimeSel = section.querySelector('[data-role="runtime"]');
-      const editor = editors[idx];
+    function buildTestsPayload() {
+      coerceStateFromDOM();
+      return tests.filter(t => t.runtime_id && t.test_source);
+    }
+
+    function buildQuestionPayload() {
       return {
-        runtime_id: runtimeSel.value ? Number(runtimeSel.value) : null,
-        test_source: (editor?.getValue() || "").trim()
+        question_type: "structural",
+        prompt: (promptEl.value || "").trim(),
+        timeout_seconds: Number(timeoutEl.value || 0),
+        memory_limit_mb: Number(memoryEl.value || 0),
+        structural_tests: buildTestsPayload(),
       };
-    });
-  }
-
-  function clearFieldErrors(section) {
-    ["runtime", "test_source"].forEach(field => {
-      const err = section.querySelector(`[data-err="${field}"]`);
-      if (err) { err.textContent = ""; err.classList.add("hidden"); }
-    });
-  }
-  function showFieldError(section, field, message) {
-    const err = section.querySelector(`[data-err="${field}"]`);
-    if (!err) return;
-    err.textContent = message; err.classList.remove("hidden");
-  }
-
-  function validateClient() {
-    coerceStateFromDOM();
-    let ok = true;
-
-    // Prompt
-    if (!promptEl.value.trim()) {
-      ok = false;
-      errPrompt.textContent = "Prompt is required.";
-      errPrompt.classList.remove("hidden");
-    } else {
-      errPrompt.classList.add("hidden");
     }
 
-    // Limits
-    const timeout = Number(timeoutEl.value);
-    const memory = Number(memoryEl.value);
-    if (!(Number.isInteger(timeout) && timeout > 0)) {
-      ok = false; errTimeout.textContent = "Enter a positive integer."; errTimeout.classList.remove("hidden");
-    } else { errTimeout.classList.add("hidden"); }
-    if (!(Number.isInteger(memory) && memory > 0)) {
-      ok = false; errMemory.textContent = "Enter a positive integer."; errMemory.classList.remove("hidden");
-    } else { errMemory.classList.add("hidden"); }
+    function renderPreview() {
+      testsPreview.textContent = JSON.stringify(buildTestsPayload(), null, 2);
+      questionPreview.textContent = JSON.stringify(buildQuestionPayload(), null, 2);
+    }
 
-    // Per‑runtime
-    const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
-    const runtimeIds = [];
-    sections.forEach((section, idx) => {
-      clearFieldErrors(section);
-      const rt = tests[idx].runtime_id;
-      const src = tests[idx].test_source;
-      if (!rt) { ok = false; showFieldError(section, "runtime", "Select a runtime."); }
-      if (!src) { ok = false; showFieldError(section, "test_source", "Test source is required."); }
-      runtimeIds.push(rt);
+    validateBtn.addEventListener("click", () => {
+      renderPreview();
+      show(validateClient() ? toastOk : toastErr);
     });
 
-    // At least one, and no duplicates
-    const chosen = runtimeIds.filter(Boolean);
-    if (chosen.length === 0) ok = false;
-    if (new Set(chosen).size !== chosen.length) {
-      ok = false;
-      // surface generic duplicate message
-      sections.forEach(section => showFieldError(section, "runtime", "Duplicate runtime. Choose a different one."));
-    }
+    saveBtn.addEventListener("click", async () => {
+      renderPreview();
+      if (!validateClient()) { show(toastSaveErr); return; }
+      const payload = buildQuestionPayload();
+      try {
+        const res = await fetch("{% url 'structural-save' %}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        show(res.ok && data.ok ? toastSaveOk : toastSaveErr);
+      } catch {
+        show(toastSaveErr);
+      }
+    });
 
-    return ok;
-  }
+    function show(el, ms = 1800) { if (!el) return; el.classList.remove("hidden"); setTimeout(() => el.classList.add("hidden"), ms); }
+    function debounce(fn, wait) { let t; return function () { clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), wait); }; }
 
-  // ----- Builders & Preview -----
-  function buildTestsPayload() {
-    coerceStateFromDOM();
-    return tests.filter(t => t.runtime_id && t.test_source);
-  }
-
-  function buildQuestionPayload() {
-    return {
-      question_type: "structural",
-      prompt: (promptEl.value || "").trim(),
-      timeout_seconds: Number(timeoutEl.value || 0),
-      memory_limit_mb: Number(memoryEl.value || 0),
-      structural_tests: buildTestsPayload(),
-    };
-  }
-
-  function renderPreview() {
-    testsPreview.textContent = JSON.stringify(buildTestsPayload(), null, 2);
-    questionPreview.textContent = JSON.stringify(buildQuestionPayload(), null, 2);
-  }
-
-  // ----- Events -----
-  testsContainer.addEventListener("click", e => {
-    const section = e.target.closest("[data-test-index]");
-    if (!section) return;
-    const idx = parseInt(section.dataset.testIndex, 10);
-
-    if (e.target.closest("[data-action='removeCard']") && tests.length > 1) {
-      tests.splice(idx, 1);
-      renderTests(); renderPreview();
-    }
-  });
-
-  addTestBtn.addEventListener("click", () => {
-    tests.push({ runtime_id: null, test_source: "" });
     renderTests(); renderPreview();
-  });
-
-  validateBtn.addEventListener("click", () => {
-    renderPreview();
-    show(validateClient() ? toastOk : toastErr);
-  });
-
-  saveBtn.addEventListener("click", async () => {
-    renderPreview();
-    if (!validateClient()) { show(toastSaveErr); return; }
-    const payload = buildQuestionPayload();
-    try {
-      const res = await fetch("{% url 'structural-save' %}", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json().catch(() => ({}));
-      show(res.ok && data.ok ? toastSaveOk : toastSaveErr);
-    } catch {
-      show(toastSaveErr);
-    }
-  });
-
-  function show(el, ms=1800){ if(!el) return; el.classList.remove("hidden"); setTimeout(()=>el.classList.add("hidden"), ms); }
-  function debounce(fn, wait){ let t; return function(){ clearTimeout(t); t=setTimeout(()=>fn.apply(this, arguments), wait); }; }
-
-  // Initial render
-  renderTests(); renderPreview();
-})();
+  })();
 </script>
 
 {% endblock %}
