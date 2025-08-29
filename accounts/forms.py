@@ -85,7 +85,19 @@ class StyledSetPasswordForm(SetPasswordForm):
     )
 
 
+
+# accounts/forms.py
 class SignUpForm(forms.ModelForm):
+    first_name = forms.CharField(
+        label="First name",
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full", "autocomplete": "given-name"}),
+    )
+    last_name = forms.CharField(
+        label="Last name",
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full", "autocomplete": "family-name"}),
+    )
     email = forms.EmailField(
         label="Email",
         widget=forms.EmailInput(attrs={"autocomplete": "email", "class": "input input-bordered w-full"})
@@ -94,7 +106,7 @@ class SignUpForm(forms.ModelForm):
         label="Password",
         strip=False,
         widget=forms.PasswordInput(attrs={"autocomplete": "new-password", "class": "input input-bordered w-full"}),
-        help_text=None,  # Django will inject help_text via template if you want
+        help_text=None,
     )
     password2 = forms.CharField(
         label="Confirm password",
@@ -104,7 +116,7 @@ class SignUpForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ("email",)
+        fields = ("first_name", "last_name", "email")
 
     def clean_email(self):
         email = self.cleaned_data["email"].lower()
@@ -114,11 +126,18 @@ class SignUpForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        # enforce non-empty names (extra safety if templates strip required=)
+        fn = (cleaned.get("first_name") or "").strip()
+        ln = (cleaned.get("last_name") or "").strip()
+        if not fn:
+            self.add_error("first_name", "First name is required.")
+        if not ln:
+            self.add_error("last_name", "Last name is required.")
+
         p1 = cleaned.get("password1")
         p2 = cleaned.get("password2")
         if p1 and p2 and p1 != p2:
             self.add_error("password2", "Passwords do not match.")
-        # Run Django’s password validators
         if p1:
             validate_password(p1, user=None)
         return cleaned
@@ -126,13 +145,13 @@ class SignUpForm(forms.ModelForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.email = self.cleaned_data["email"].lower()
-        # If you’re using a custom user with email as username, you may want:
-        if hasattr(user, "username") and not user.username:
-            user.username = user.email  # harmless if username field exists
+        user.first_name = (self.cleaned_data["first_name"] or "").strip()
+        user.last_name = (self.cleaned_data["last_name"] or "").strip()
         user.set_password(self.cleaned_data["password1"])
         if commit:
             user.save()
         return user
+
 
 
 class ResendActivationForm(forms.Form):
