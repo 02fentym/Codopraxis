@@ -1,0 +1,4 @@
+# codequestions/settings.py
+
+DEFAULT_TIMEOUT_SECONDS = 2
+DEFAULT_MEMORY_LIMIT_MB = 256

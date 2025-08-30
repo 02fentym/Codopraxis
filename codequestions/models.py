@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 import hashlib
 from sandbox.models import Runtime
+from .constants import DEFAULT_TIMEOUT_SECONDS, DEFAULT_MEMORY_LIMIT_MB
 
 
 # ---------- CodeQuestion & StructuralTest ----------
@@ -16,8 +17,8 @@ class CodeQuestion(models.Model):
     prompt = models.TextField()
 
     # Execution guards
-    timeout_seconds = models.PositiveIntegerField(default=5)
-    memory_limit_mb = models.PositiveIntegerField(default=256)
+    timeout_seconds = models.PositiveIntegerField(default=DEFAULT_TIMEOUT_SECONDS)
+    memory_limit_mb = models.PositiveIntegerField(default=DEFAULT_MEMORY_LIMIT_MB)
 
     # Only for standardio questions (language-agnostic tests)
     tests_json = models.JSONField(null=True, blank=True)

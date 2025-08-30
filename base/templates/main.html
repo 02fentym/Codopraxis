@@ -7,6 +7,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Codopraxis{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+
+    <!-- highlight.js CSS (local) -->
+    <link id="hljs-theme" rel="stylesheet" href="{% static 'vendor/highlightjs/styles/atom-one-light.min.css' %}">
+
+    <!-- Toast UI Editor CSS (local) -->
+    <link rel="stylesheet" href="{% static 'vendor/toastui/editor/toastui-editor.min.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/toastui/editor/toastui-editor-viewer.min.css' %}">
+
+    <!-- Toast UI Editor JS (local, “all” bundle) -->
+    <script src="{% static 'vendor/toastui/editor/toastui-editor-all.min.js' %}"></script>
+
+    <!-- Code syntax highlight plugin (local) -->
+    <script src="{% static 'vendor/toastui/plugin-code-syntax-highlight/toastui-editor-plugin-code-syntax-highlight.min.js' %}"></script>
+
 </head>
 
 <body class="min-h-screen">

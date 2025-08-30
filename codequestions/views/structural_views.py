@@ -6,7 +6,7 @@ from django.views.decorators.http import require_POST, require_GET
 from django.core.exceptions import ValidationError
 from sandbox.models import Runtime
 from codequestions.models import CodeQuestion, StructuralTest
-
+from codequestions.constants import DEFAULT_TIMEOUT_SECONDS, DEFAULT_MEMORY_LIMIT_MB
 
 def structural_builder(request):
     qs = (
@@ -30,7 +30,8 @@ def structural_builder(request):
         for rt in qs
     ]
 
-    return render(request, "codequestions/structural_builder.html", {"runtimes": runtimes})
+    context = {"runtimes": runtimes, "timeout_default": DEFAULT_TIMEOUT_SECONDS, "memory_default": DEFAULT_MEMORY_LIMIT_MB,}
+    return render(request, "codequestions/structural_builder.html", context)
 
 
 @require_POST

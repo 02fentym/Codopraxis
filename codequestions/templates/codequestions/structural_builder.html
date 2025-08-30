@@ -3,193 +3,212 @@
 {% block title %}Structural Builder{% endblock %}
 {% block content %}
 
-<div class="max-w-7xl mx-auto space-y-6">
-  <!-- Breadcrumbs -->
-  <div class="breadcrumbs text-sm">
-    <ul>
-      <li><a href="{% url 'home' %}" class="link">Home</a></li>
-      <li><span class="opacity-70">Code Questions</span></li>
-      <li class="font-semibold">Structural Builder</li>
-    </ul>
-  </div>
+<div class="w-[90%] mx-auto space-y-6">
+    <!-- Breadcrumbs -->
+    <div class="breadcrumbs text-sm">
+        <ul>
+            <li><a href="{% url 'home' %}" class="link">Home</a></li>
+            <li><span class="opacity-70">Code Questions</span></li>
+            <li class="font-semibold">Structural Builder</li>
+        </ul>
+    </div>
 
-  <!-- Embed runtimes as JSON (needs language.slug; includes syntax_highlighter_mode if available) -->
-  {{ runtimes|json_script:"runtimes-data" }}
+    <!-- Embed runtimes as JSON (needs language.slug; includes syntax_highlighter_mode if available) -->
+    {{ runtimes|json_script:"runtimes-data" }}
 
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Left: Builder Card -->
+    <!-- Single card (no right-side preview) -->
     <div class="card bg-base-200">
-      <div class="card-body space-y-6">
-        <h1 class="card-title text-3xl">Structural Builder</h1>
+        <div class="card-body space-y-6">
+            <h1 class="card-title text-3xl">Structural Builder</h1>
 
-        <form id="builder-form" method="post" class="space-y-6">
-          {% csrf_token %}
+            <form id="builder-form" method="post" class="space-y-6">
+                {% csrf_token %}
 
-          <!-- Hidden: force question_type -->
-          <input type="hidden" id="question_type" value="structural">
+                <!-- Hidden: force question_type -->
+                <input type="hidden" id="question_type" value="structural">
 
-          <!-- Prompt -->
-          <div class="form-control">
-            <label class="label block">
-              <span class="label-text font-medium">
-                Prompt <span class="opacity-60 text-xs">(shown to students)</span>
-              </span>
-            </label>
-            <textarea id="prompt" name="prompt" class="textarea textarea-bordered bg-base-100 w-full h-24"
-              placeholder="Implement a class Counter with increment() and get() methods."></textarea>
-            <p class="text-error text-xs mt-1 hidden" id="err_prompt"></p>
-          </div>
+                <!-- Prompt (Toast UI Editor) -->
+                <div class="form-control">
+                    <label class="label block">
+                        <span class="label-text font-medium">
+                            Prompt <span class="opacity-60 text-xs">(shown to students)</span>
+                        </span>
+                    </label>
 
-          <!-- Limits -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="form-control">
-              <label class="label block">
-                <span class="label-text font-medium">Timeout (seconds)</span>
-              </label>
-              <input id="timeout_seconds" type="number" min="1" step="1" class="input input-bordered w-full"
-                value="{{ timeout_default|default:5 }}">
-              <p class="text-error text-xs mt-1 hidden" id="err_timeout"></p>
-              <label class="label">
-                <span class="opacity-60 text-xs">Max time per test execution.</span>
-              </label>
-            </div>
+                    <!-- Toast UI mounts here -->
+                    <div id="promptEditor" class="bg-base-100 rounded-box"></div>
 
-            <div class="form-control">
-              <label class="label block">
-                <span class="label-text font-medium">Memory limit (MB)</span>
-              </label>
-              <input id="memory_limit_mb" type="number" min="16" step="1" class="input input-bordered w-full"
-                value="{{ memory_default|default:256 }}">
-              <p class="text-error text-xs mt-1 hidden" id="err_memory"></p>
-              <label class="label">
-                <span class="opacity-60 text-xs">Max memory per test execution.</span>
-              </label>
-            </div>
-          </div>
+                    <!-- optional starter content (can be blank) -->
+                    <textarea id="prompt_initial" class="hidden">
+Implement a class `Counter` with:
+- `increment()` increases count by 1
+- `get()` returns the current count
+          </textarea>
 
-          <div class="divider my-0 w-auto text-lg font-bold mb-6">Per-runtime structural tests</div>
+                    <p class="text-error text-xs mt-1 hidden" id="err_prompt"></p>
+                </div>
 
-          <!-- Tests container -->
-          <div id="testsContainer" class="space-y-6"></div>
-        </form>
-      </div>
+                <!-- Limits -->
+                <div class="flex flex-col sm:flex-row sm:items-end gap-2">
+                    <!-- Timeout -->
+                    <div class="form-control">
+                        <label class="label block">
+                            <span class="label-text font-medium">Timeout (seconds)</span>
+                        </label>
+                        <input id="timeout_seconds" type="number" min="1" step="1" class="input input-bordered w-auto max-w-[8rem]"
+                            value="{{ timeout_default }}">
+                        <p class="text-error text-xs mt-1 hidden" id="err_timeout"></p>
+                        <p class="text-xs opacity-60 mt-1">Max time per test execution.</p>
+                    </div>
+                
+                    <!-- Memory -->
+                    <div class="form-control">
+                        <label class="label block">
+                            <span class="label-text font-medium">Memory limit (MB)</span>
+                        </label>
+                        <input id="memory_limit_mb" type="number" min="16" step="1" class="input input-bordered w-auto max-w-[10rem]"
+                            value="{{ memory_default }}">
+                        <p class="text-error text-xs mt-1 hidden" id="err_memory"></p>
+                        <p class="text-xs opacity-60 mt-1">Max memory per test execution.</p>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <div class="divider my-0 w-auto text-lg font-bold mb-2">Per-runtime structural tests</div>
+
+                <!-- Tests container -->
+                <div id="testsContainer" class="space-y-6"></div>
+
+                <!-- Actions (moved here, after tests) -->
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <button id="validateBtn" type="button" class="btn btn-primary btn-sm">Validate</button>
+                    <button id="saveBtn" type="button" class="btn btn-success btn-sm">Save</button>
+                </div>
+
+                <!-- Toasts -->
+                <div id="toastSaveOk" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-success"><span>Saved.</span></div>
+                </div>
+                <div id="toastSaveErr" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-error"><span>Save failed. Fix errors and try again.</span></div>
+                </div>
+                <div id="toastOk" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-success"><span>Looks good.</span></div>
+                </div>
+                <div id="toastErr" class="toast toast-end z-50 hidden">
+                    <div class="alert alert-error"><span>Issues found. See highlights.</span></div>
+                </div>
+            </form>
+        </div>
     </div>
-
-    <!-- Right: Preview -->
-    <div class="card bg-base-200 lg:sticky lg:top-6 h-fit">
-      <div class="card-body space-y-3">
-        <h2 class="card-title text-2xl">Preview</h2>
-
-        <div class="collapse collapse-arrow bg-base-100">
-          <input type="checkbox" checked>
-          <div class="collapse-title font-semibold">Question payload</div>
-          <div class="collapse-content">
-            <div class="mockup-code text-xs bg-base-100">
-              <pre><code id="questionPreview">{}</code></pre>
-            </div>
-          </div>
-        </div>
-
-        <div class="collapse collapse-arrow bg-base-100">
-          <input type="checkbox">
-          <div class="collapse-title font-semibold">Structural tests (per runtime)</div>
-          <div class="collapse-content">
-            <div class="mockup-code text-xs bg-base-100">
-              <pre><code id="testsPreview">[]</code></pre>
-            </div>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="mt-2 flex flex-wrap items-center gap-2">
-          <button id="validateBtn" type="button" class="btn btn-primary btn-sm">Validate</button>
-          <button id="saveBtn" type="button" class="btn btn-success btn-sm">Save</button>
-        </div>
-
-        <!-- Toasts -->
-        <div id="toastSaveOk" class="toast toast-end z-50 hidden">
-          <div class="alert alert-success"><span>Saved.</span></div>
-        </div>
-        <div id="toastSaveErr" class="toast toast-end z-50 hidden">
-          <div class="alert alert-error"><span>Save failed. Fix errors and try again.</span></div>
-        </div>
-        <div id="toastOk" class="toast toast-end z-50 hidden">
-          <div class="alert alert-success"><span>Looks good.</span></div>
-        </div>
-        <div id="toastErr" class="toast toast-end z-50 hidden">
-          <div class="alert alert-error"><span>Issues found. See highlights.</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 
-<!-- Ace Editor -->
+<!-- Optional styling overrides (keep or remove) -->
+<style>
+    #promptEditor .toastui-editor-md-mode,
+    #promptEditor .toastui-editor-ww-code-block,
+    #promptEditor .ProseMirror {
+        background-color: #000000 !important;
+        color: #ffffff !important;
+    }
+
+    #promptEditor .toastui-editor-md-mode *,
+    #promptEditor .toastui-editor-ww-code-block *,
+    #promptEditor .ProseMirror * {
+        color: #ffffff !important;
+    }
+
+    [data-theme="codo-dark"] #promptEditor .toastui-editor-md-mode,
+    [data-theme="codo-dark"] #promptEditor .toastui-editor-ww-code-block,
+    [data-theme="codo-dark"] #promptEditor .ProseMirror {
+        background-color: #000000 !important;
+        color: #ffffff !important;
+    }
+
+    [data-theme="codo-dark"] #promptEditor .toastui-editor-md-mode *,
+    [data-theme="codo-dark"] #promptEditor .toastui-editor-ww-code-block *,
+    [data-theme="codo-dark"] #promptEditor .ProseMirror * {
+        color: #ffffff !important;
+    }
+</style>
+
+<!-- Ace Editor (for runtime test source) -->
 <script src="{% static 'vendor/ace-1.36.2/ace.js' %}"></script>
 <script src="{% static 'vendor/ace-1.36.2/ext-language_tools.js' %}"></script>
 
 <script>
-  (function () {
-    const $ = (id) => document.getElementById(id);
+    (function () {
+        const $ = (id) => document.getElementById(id);
 
-    const promptEl = $("prompt");
-    const timeoutEl = $("timeout_seconds");
-    const memoryEl = $("memory_limit_mb");
+        const timeoutEl = $("timeout_seconds");
+        const memoryEl = $("memory_limit_mb");
 
-    const errPrompt = $("err_prompt");
-    const errTimeout = $("err_timeout");
-    const errMemory = $("err_memory");
+        const errPrompt = $("err_prompt");
+        const errTimeout = $("err_timeout");
+        const errMemory = $("err_memory");
 
-    const testsContainer = $("testsContainer");
-    const questionPreview = $("questionPreview");
-    const testsPreview = $("testsPreview");
+        const testsContainer = $("testsContainer");
 
-    const validateBtn = $("validateBtn");
-    const saveBtn = $("saveBtn");
-    const toastOk = $("toastOk");
-    const toastErr = $("toastErr");
-    const toastSaveOk = $("toastSaveOk");
-    const toastSaveErr = $("toastSaveErr");
+        const validateBtn = $("validateBtn");
+        const saveBtn = $("saveBtn");
+        const toastOk = $("toastOk");
+        const toastErr = $("toastErr");
+        const toastSaveOk = $("toastSaveOk");
+        const toastSaveErr = $("toastSaveErr");
 
-    // ----- CSRF + runtimes -----
-    function getCookie(name) {
-      const v = document.cookie.split("; ").find(row => row.startsWith(name + "="));
-      return v ? decodeURIComponent(v.split("=")[1]) : null;
-    }
-    const csrftoken = getCookie("csrftoken");
+        // ----- CSRF + runtimes -----
+        function getCookie(name) {
+            const v = document.cookie.split("; ").find(row => row.startsWith(name + "="));
+            return v ? decodeURIComponent(v.split("=")[1]) : null;
+        }
+        const csrftoken = getCookie("csrftoken");
 
-    const RUNTIMES = JSON.parse(document.getElementById("runtimes-data").textContent);
-    const RUNTIME_BY_ID = {};
-    RUNTIMES.forEach(rt => {
-      const lang = rt.language || {};
-      rt._mode = (lang.syntax_highlighter_mode || lang.slug || "text").toLowerCase();
-      RUNTIME_BY_ID[rt.id] = rt;
-    });
+        const RUNTIMES = JSON.parse(document.getElementById("runtimes-data").textContent);
+        const RUNTIME_BY_ID = {};
+        RUNTIMES.forEach(rt => {
+            const lang = rt.language || {};
+            rt._mode = (lang.syntax_highlighter_mode || lang.slug || "text").toLowerCase();
+            RUNTIME_BY_ID[rt.id] = rt;
+        });
 
-    // ----- Ace setup -----
-    ace.config.set("basePath", "{% static 'vendor/ace-1.36.2' %}");
-    ace.require("ace/ext/language_tools");
+        // ----- Toast UI Editor (Prompt) -----
+        let promptEditor;
+        try {
+            const Editor = window.toastui?.Editor || window.toastui;
+            const codeSyntaxHighlight = (window.toastui?.Editor?.plugin?.codeSyntaxHighlight) || undefined;
 
-    let editors = [];
+            promptEditor = new Editor({
+                el: document.getElementById("promptEditor"),
+                height: "280px",
+                initialEditType: "markdown",
+                previewStyle: "vertical",
+                plugins: codeSyntaxHighlight && window.hljs ? [[codeSyntaxHighlight, { hljs: window.hljs }]] : [],
+            });
+        } catch (e) {
+            console.error("Toast UI Editor failed to initialize:", e);
+        }
 
-    // Single test state
-    let tests = [
-      { runtime_id: null, test_source: "" }
-    ];
+        // ----- Ace setup (for per-runtime test source) -----
+        ace.config.set("basePath", "{% static 'vendor/ace-1.36.2' %}");
+        ace.require("ace/ext/language_tools");
 
-    function runtimeOptionsHTML(selectedId) {
-      return ['<option value="">— Select runtime —</option>']
-        .concat(RUNTIMES.map(rt => {
-          const label = `${rt.language.name} · ${rt.name}`;
-          const sel = String(selectedId || "") === String(rt.id) ? " selected" : "";
-          return `<option value="${rt.id}"${sel}>${label}</option>`;
-        })).join("");
-    }
+        let editors = [];
+        // Single test state
+        let tests = [{ runtime_id: null, test_source: "" }];
 
-    function testCardTemplate(idx, t) {
-      const runtimeId = `runtime_${idx + 1}`;
-      const editorId = `editor_${idx + 1}`;
-      return `
+        function runtimeOptionsHTML(selectedId) {
+            return ['<option value="">— Select runtime —</option>']
+                .concat(RUNTIMES.map(rt => {
+                    const label = `${rt.language.name} · ${rt.name}`;
+                    const sel = String(selectedId || "") === String(rt.id) ? " selected" : "";
+                    return `<option value="${rt.id}"${sel}>${label}</option>`;
+                })).join("");
+        }
+
+        function testCardTemplate(idx, t) {
+            const runtimeId = `runtime_${idx + 1}`;
+            const editorId = `editor_${idx + 1}`;
+            return `
       <div class="space-y-3 border border-2 border-base-100 rounded-box px-4 py-2" data-test-index="${idx}">
         <div class="font-medium text-lg">Runtime test</div>
 
@@ -204,161 +223,159 @@
           <p class="text-error text-xs mt-1 hidden" data-err="runtime"></p>
         </div>
 
-        <!-- Test source -->
+        <!-- Test source (Ace editor replaces this div) -->
         <div class="form-control">
           <label class="label block">
             <span class="label-text font-medium">Test source</span>
           </label>
-          <div id="${editorId}" data-role="ace" class="w-full rounded-box border border-base-300"
-               style="height: 260px;"></div>
+          <div id="${editorId}" data-role="ace" class="w-full rounded-box border border-base-300" style="height: 260px;"></div>
           <p class="text-error text-xs mt-1 hidden" data-err="test_source"></p>
         </div>
       </div>
     `;
-    }
+        }
 
-    function destroyEditors() {
-      editors.forEach(ed => { try { ed?.destroy(); } catch (_) {} });
-      editors = [];
-    }
+        function destroyEditors() { editors.forEach(ed => { try { ed?.destroy(); } catch (_) { } }); editors = []; }
 
-    function initEditors() {
-      const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
-      sections.forEach((section, idx) => {
-        const edDiv = section.querySelector('[data-role="ace"]');
-        const runtimeSel = section.querySelector('[data-role="runtime"]');
+        function initEditors() {
+            const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
+            sections.forEach((section, idx) => {
+                const edDiv = section.querySelector('[data-role="ace"]');
+                const runtimeSel = section.querySelector('[data-role="runtime"]');
 
-        const editor = ace.edit(edDiv);
-        editor.setOptions({
-          enableBasicAutocompletion: true,
-          enableLiveAutocompletion: false,
-          enableSnippets: false,
-          fontSize: "12px",
-          tabSize: 2,
-          useSoftTabs: true,
+                const editor = ace.edit(edDiv);
+                editor.setOptions({
+                    enableBasicAutocompletion: true,
+                    enableLiveAutocompletion: false,
+                    enableSnippets: false,
+                    fontSize: "12px",
+                    tabSize: 2,
+                    useSoftTabs: true,
+                });
+                editor.setTheme("ace/theme/chaos");
+
+                editor.session.setValue(tests[idx].test_source || "");
+
+                const rtId = runtimeSel.value ? Number(runtimeSel.value) : null;
+                const mode = rtId ? (RUNTIME_BY_ID[rtId]?._mode || "text") : "text";
+                editor.session.setMode("ace/mode/" + mode);
+
+                editors[idx] = editor;
+
+                runtimeSel.addEventListener("change", () => {
+                    const rid = runtimeSel.value ? Number(runtimeSel.value) : null;
+                    const m = rid ? (RUNTIME_BY_ID[rid]?._mode || "text") : "text";
+                    editor.session.setMode("ace/mode/" + m);
+                });
+
+                editor.session.on("change", debounce(() => { }, 150));
+            });
+        }
+
+        function renderTests() {
+            destroyEditors();
+            testsContainer.innerHTML = tests.map((t, i) => testCardTemplate(i, t)).join("");
+            initEditors();
+        }
+
+        function coerceStateFromDOM() {
+            const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
+            tests = sections.map((section, idx) => {
+                const runtimeSel = section.querySelector('[data-role="runtime"]');
+                const editor = editors[idx];
+                return {
+                    runtime_id: runtimeSel.value ? Number(runtimeSel.value) : null,
+                    test_source: (editor?.getValue() || "").trim()
+                };
+            });
+        }
+
+        // --- prompt value (Markdown) ---
+        function promptValue() {
+            try { return (promptEditor?.getMarkdown() || "").trim(); }
+            catch { return ""; }
+        }
+
+        // --- validation ---
+        function validateClient() {
+            coerceStateFromDOM();
+            let ok = true;
+
+            const pv = promptValue();
+            if (!pv) {
+                ok = false;
+                errPrompt.textContent = "Prompt is required.";
+                errPrompt.classList.remove("hidden");
+            } else {
+                errPrompt.classList.add("hidden");
+            }
+
+            const timeout = Number(timeoutEl.value);
+            const memory = Number(memoryEl.value);
+            if (!(Number.isInteger(timeout) && timeout > 0)) {
+                ok = false; errTimeout.textContent = "Enter a positive integer."; errTimeout.classList.remove("hidden");
+            } else { errTimeout.classList.add("hidden"); }
+            if (!(Number.isInteger(memory) && memory > 0)) {
+                ok = false; errMemory.textContent = "Enter a positive integer."; errMemory.classList.remove("hidden");
+            } else { errMemory.classList.add("hidden"); }
+
+            const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
+            let hasRuntime = false;
+            sections.forEach((section, idx) => {
+                const rt = tests[idx].runtime_id;
+                const src = tests[idx].test_source;
+                const errRt = section.querySelector('[data-err="runtime"]');
+                const errSrc = section.querySelector('[data-err="test_source"]');
+
+                if (!rt) { ok = false; if (errRt) { errRt.textContent = "Select a runtime."; errRt.classList.remove("hidden"); } }
+                else { if (errRt) errRt.classList.add("hidden"); hasRuntime = true; }
+
+                if (!src) { ok = false; if (errSrc) { errSrc.textContent = "Test source is required."; errSrc.classList.remove("hidden"); } }
+                else { if (errSrc) errSrc.classList.add("hidden"); }
+            });
+
+            if (!hasRuntime) ok = false;
+            return ok;
+        }
+
+        // --- payload ---
+        function buildQuestionPayload() {
+            return {
+                question_type: "structural",
+                prompt: promptValue(),
+                timeout_seconds: Number(timeoutEl.value || 0),
+                memory_limit_mb: Number(memoryEl.value || 0),
+                structural_tests: (coerceStateFromDOM(), tests.filter(t => t.runtime_id && t.test_source)),
+            };
+        }
+
+        // --- events ---
+        validateBtn.addEventListener("click", () => {
+            show(validateClient() ? toastOk : toastErr);
         });
-        editor.setTheme("ace/theme/chaos");
 
-        editor.session.setValue(tests[idx].test_source || "");
-
-        const rtId = runtimeSel.value ? Number(runtimeSel.value) : null;
-        const mode = rtId ? (RUNTIME_BY_ID[rtId]?._mode || "text") : "text";
-        editor.session.setMode("ace/mode/" + mode);
-
-        editors[idx] = editor;
-
-        runtimeSel.addEventListener("change", () => {
-          const rid = runtimeSel.value ? Number(runtimeSel.value) : null;
-          const m = rid ? (RUNTIME_BY_ID[rid]?._mode || "text") : "text";
-          editor.session.setMode("ace/mode/" + m);
-          renderPreview();
+        saveBtn.addEventListener("click", async () => {
+            if (!validateClient()) { show(toastSaveErr); return; }
+            const payload = buildQuestionPayload();
+            try {
+                const res = await fetch("{% url 'structural-save' %}", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json().catch(() => ({}));
+                show(res.ok && data.ok ? toastSaveOk : toastSaveErr);
+            } catch {
+                show(toastSaveErr);
+            }
         });
 
-        editor.session.on("change", debounce(renderPreview, 150));
-      });
-    }
+        function show(el, ms = 1800) { if (!el) return; el.classList.remove("hidden"); setTimeout(() => el.classList.add("hidden"), ms); }
+        function debounce(fn, wait) { let t; return function () { clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), wait); }; }
 
-    function renderTests() {
-      destroyEditors();
-      testsContainer.innerHTML = tests.map((t, i) => testCardTemplate(i, t)).join("");
-      initEditors();
-    }
-
-    function coerceStateFromDOM() {
-      const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
-      tests = sections.map((section, idx) => {
-        const runtimeSel = section.querySelector('[data-role="runtime"]');
-        const editor = editors[idx];
-        return {
-          runtime_id: runtimeSel.value ? Number(runtimeSel.value) : null,
-          test_source: (editor?.getValue() || "").trim()
-        };
-      });
-    }
-
-    function validateClient() {
-      coerceStateFromDOM();
-      let ok = true;
-
-      if (!promptEl.value.trim()) {
-        ok = false;
-        errPrompt.textContent = "Prompt is required.";
-        errPrompt.classList.remove("hidden");
-      } else {
-        errPrompt.classList.add("hidden");
-      }
-
-      const timeout = Number(timeoutEl.value);
-      const memory = Number(memoryEl.value);
-      if (!(Number.isInteger(timeout) && timeout > 0)) {
-        ok = false; errTimeout.textContent = "Enter a positive integer."; errTimeout.classList.remove("hidden");
-      } else { errTimeout.classList.add("hidden"); }
-      if (!(Number.isInteger(memory) && memory > 0)) {
-        ok = false; errMemory.textContent = "Enter a positive integer."; errMemory.classList.remove("hidden");
-      } else { errMemory.classList.add("hidden"); }
-
-      const sections = [...testsContainer.querySelectorAll("[data-test-index]")];
-      const runtimeIds = [];
-      sections.forEach((section, idx) => {
-        const rt = tests[idx].runtime_id;
-        const src = tests[idx].test_source;
-        if (!rt) { ok = false; section.querySelector('[data-err="runtime"]').textContent = "Select a runtime."; }
-        if (!src) { ok = false; section.querySelector('[data-err="test_source"]').textContent = "Test source is required."; }
-        runtimeIds.push(rt);
-      });
-
-      if (runtimeIds.filter(Boolean).length === 0) ok = false;
-
-      return ok;
-    }
-
-    function buildTestsPayload() {
-      coerceStateFromDOM();
-      return tests.filter(t => t.runtime_id && t.test_source);
-    }
-
-    function buildQuestionPayload() {
-      return {
-        question_type: "structural",
-        prompt: (promptEl.value || "").trim(),
-        timeout_seconds: Number(timeoutEl.value || 0),
-        memory_limit_mb: Number(memoryEl.value || 0),
-        structural_tests: buildTestsPayload(),
-      };
-    }
-
-    function renderPreview() {
-      testsPreview.textContent = JSON.stringify(buildTestsPayload(), null, 2);
-      questionPreview.textContent = JSON.stringify(buildQuestionPayload(), null, 2);
-    }
-
-    validateBtn.addEventListener("click", () => {
-      renderPreview();
-      show(validateClient() ? toastOk : toastErr);
-    });
-
-    saveBtn.addEventListener("click", async () => {
-      renderPreview();
-      if (!validateClient()) { show(toastSaveErr); return; }
-      const payload = buildQuestionPayload();
-      try {
-        const res = await fetch("{% url 'structural-save' %}", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json().catch(() => ({}));
-        show(res.ok && data.ok ? toastSaveOk : toastSaveErr);
-      } catch {
-        show(toastSaveErr);
-      }
-    });
-
-    function show(el, ms = 1800) { if (!el) return; el.classList.remove("hidden"); setTimeout(() => el.classList.add("hidden"), ms); }
-    function debounce(fn, wait) { let t; return function () { clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), wait); }; }
-
-    renderTests(); renderPreview();
-  })();
+        // Initial render
+        renderTests();
+    })();
 </script>
 
 {% endblock %}
