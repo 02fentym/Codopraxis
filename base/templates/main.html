@@ -45,73 +45,143 @@
     </div>
 
     <!-- Mini↔Expanded behavior (width + label visibility) -->
-    <style>
-        /* Sidebar widths */
-        #sidebar {
-            width: 56px;
-            transition: width .22s ease;
-        }
-    
-        /* mini */
-        #app-shell.sidebar-expanded #sidebar {
-            width: 280px;
-        }
-    
-        /* expanded */
-    
-        /* Labels hidden in mini, shown in expanded */
-        #app-shell .nav-label {
-            opacity: 0;
-            width: 0;
-            overflow: hidden;
-            white-space: nowrap;
-            transform: translateX(-4px);
-            transition: opacity .18s ease, transform .18s ease;
-        }
-    
-        #app-shell.sidebar-expanded .nav-label {
-            opacity: 1;
-            width: auto;
-            transform: none;
-        }
-    
-        /* Mini mode: center the icon, no row hover, tight padding */
-        #app-shell:not(.sidebar-expanded) .menu :where(li > *:not(ul)) {
-            justify-content: center;
-            /* centers icon column */
-            gap: 0;
-            /* no gap since label is hidden */
-            padding-left: .25rem;
-            /* tighter hit area */
-            padding-right: .25rem;
-        }
-    
-        #app-shell:not(.sidebar-expanded) .menu :where(li > *:not(ul)):hover {
-            background-color: transparent;
-            /* kill the full-row hover */
-        }
-    
-        /* Icon wrapper: this gets the hover ring instead of the row */
-        #app-shell .icon-wrap {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            height: 36px;
-            /* comfy target */
-            width: 36px;
-            border-radius: .5rem;
-            transition: box-shadow .15s ease, background-color .15s ease;
-        }
-    
-        /* Optional: show carets only when expanded (if you add any) */
-        #app-shell .nav-caret {
-            display: none;
-        }
-    
-        #app-shell.sidebar-expanded .nav-caret {
-            display: inline-flex;
-        }
-    </style>
+<style>
+    /* Existing styles remain unchanged */
+    /* Sidebar widths */
+    #sidebar {
+        width: 56px;
+        transition: width .22s ease;
+    }
+
+    #app-shell.sidebar-expanded #sidebar {
+        width: 280px;
+    }
+
+    /* Labels hidden in mini, shown in expanded */
+    #app-shell .nav-label {
+        opacity: 0;
+        width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        transform: translateX(-4px);
+        transition: opacity .18s ease, transform .18s ease;
+    }
+
+    #app-shell.sidebar-expanded .nav-label {
+        opacity: 1;
+        width: auto;
+        transform: none;
+    }
+
+    /* Mini mode: center the icon, no row hover, no padding */
+    #app-shell:not(.sidebar-expanded) .menu :where(li > *:not(ul)) {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0;
+        padding: 0;
+    }
+
+    #app-shell:not(.sidebar-expanded) .menu form button {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        padding: 0;
+    }
+
+    #app-shell:not(.sidebar-expanded) .icon-wrap {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: .5rem;
+    }
+
+    /* Icon wrapper */
+    .icon-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 36px;
+        width: 36px;
+        border-radius: .5rem;
+        transition: box-shadow .15s ease, background-color .15s ease;
+    }
+
+    #app-shell:not(.sidebar-expanded) .menu :where(li > *:not(ul)):hover {
+        background-color: transparent;
+    }
+
+    /* Optional: show carets only when expanded */
+    #app-shell .nav-caret {
+        display: none;
+    }
+
+    #app-shell.sidebar-expanded .nav-caret {
+        display: inline-flex;
+    }
+
+    /* Reset Tailwind defaults */
+    .menu li, .menu a, .menu button {
+        padding: 0;
+        margin: 0;
+    }
+
+    /* Menu-title in mini mode */
+    #app-shell:not(.sidebar-expanded) .menu-title {
+        visibility: hidden;
+        height: 28px;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Menu-title in expanded mode */
+    #app-shell.sidebar-expanded .menu-title {
+        height: 28px;
+        margin: 0;
+        padding: 0;
+        line-height: 28px;
+    }
+
+    /* Ensure Account section menu has consistent spacing */
+    #app-shell .menu.border-t {
+        margin-top: 0;
+        padding-top: 0;
+    }
+
+    /* User info div in Account section */
+    #app-shell .menu .avatar-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 36px; /* Match icon-wrap height */
+        margin: 0;
+        padding: 0;
+        gap: 0; /* No gap in mini mode */
+    }
+
+    #app-shell.sidebar-expanded .menu .avatar-container {
+        justify-content: flex-start; /* Align left in expanded mode */
+        gap: 0.5rem; /* Match menu item spacing */
+    }
+
+    /* Reset Tailwind avatar styles */
+    #app-shell .menu .avatar {
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Ensure avatar inside icon-wrap is centered */
+    #app-shell:not(.sidebar-expanded) .menu .avatar-container .icon-wrap {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 36px;
+        height: 36px;
+    }
+</style>
 
 
     <!-- Tiny JS toggle (desktop only) -->
@@ -134,7 +204,5 @@
         })();
     </script>
 </body>
-
-
 
 </html>
